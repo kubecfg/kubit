@@ -1,10 +1,10 @@
 [package]
-name = "kubecfg-operator"
+name = "kubit"
 version = "0.1.0"
 license = "MIT"
 edition = "2021"
 keywords = ["kubernetes"]
-repository = "https://github.com/kubecfg/kubecfg-operator"
+repository = "https://github.com/kubecfg/kubit"
 authors = ["Marko Mikulicic <mmikulicic@gmail.com>"]
 description = "Install kubecfg packages"
 

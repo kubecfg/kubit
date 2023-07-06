@@ -908,7 +908,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kubecfg-operator"
+name = "kubit"
 version = "0.1.0"
 dependencies = [
  "anyhow",
