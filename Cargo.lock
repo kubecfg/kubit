@@ -908,26 +908,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kubit"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "futures",
- "jsonpath_lib",
- "k8s-openapi",
- "kube",
- "kubert",
- "schemars",
- "serde",
- "serde_json",
- "serde_yaml 0.9.22",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "kubert"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -951,6 +931,26 @@ dependencies = [
  "tower-service",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "kubit"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "futures",
+ "jsonpath_lib",
+ "k8s-openapi",
+ "kube",
+ "kubert",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_yaml 0.9.22",
+ "thiserror",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
