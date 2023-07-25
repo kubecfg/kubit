@@ -22,10 +22,17 @@ spec:
             properties:
               package:
                 properties:
+                  apiVersion:
+                    type: string
                   image:
                     type: string
+                  spec:
+                    additionalProperties: true
+                    type: object
                 required:
+                - apiVersion
                 - image
+                - spec
                 type: object
             required:
             - package

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use kube::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -19,6 +21,8 @@ pub struct AppInstanceSpec {
 #[serde(rename_all = "camelCase")]
 pub struct Package {
     pub image: String,
+    pub api_version: String,
+    pub spec: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
