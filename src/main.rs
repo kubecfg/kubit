@@ -1,6 +1,6 @@
 #![deny(rustdoc::broken_intra_doc_links, rustdoc::bare_urls, rust_2018_idioms)]
 
-use std::fs::File;
+use std::{fs::File, path::PathBuf};
 
 use clap::{Parser, Subcommand};
 use kube::CustomResourceExt;
@@ -39,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
                 long,
                 help = "Optional directory to write CRDs into, otherwise write to stdout"
             )]
-            crd_dir: Option<String>,
+            crd_dir: Option<PathBuf>,
         },
     }
 
@@ -56,10 +56,8 @@ async fn main() -> anyhow::Result<()> {
             Some(crd_dir) => {
                 // Expand vector as more CRDs are created.
                 for crd in vec![&kubit::resources::AppInstance::crd()] {
-                    let crd_path = format!(
-                        "{}/{}_{}.yaml",
-                        crd_dir, crd.spec.group, crd.spec.names.plural
-                    );
+                    let crd_file = format!("{}_{}.yaml", crd.spec.group, crd.spec.names.plural);
+                    let crd_path = PathBuf::from(crd_dir).join(crd_file);
 
                     let file =
                         File::create(crd_path).expect("Could not open AppInstances CRD file");
