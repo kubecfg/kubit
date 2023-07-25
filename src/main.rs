@@ -54,11 +54,17 @@ async fn main() -> anyhow::Result<()> {
     match &command {
         Some(Commands::Manifests { crd_dir }) => match crd_dir {
             Some(crd_dir) => {
-                let crd_path = format!("{}/{}", crd_dir, kubit::resources::APPINSTANCE_CRD_FILE);
+                for crd in vec![&kubit::resources::AppInstance::crd()] {
+                    let crd_path = format!(
+                        "{}/{}_{}.yaml",
+                        crd_dir, crd.spec.group, crd.spec.names.plural
+                    );
 
-                let file = File::create(crd_path).expect("Could not open AppInstances CRD file");
+                    let file =
+                        File::create(crd_path).expect("Could not open AppInstances CRD file");
 
-                serde_yaml::to_writer(&file, &kubit::resources::AppInstance::crd())?;
+                    serde_yaml::to_writer(&file, &kubit::resources::AppInstance::crd())?;
+                }
             }
             None => println!(
                 "{}",
