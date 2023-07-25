@@ -1,5 +1,7 @@
 #![deny(rustdoc::broken_intra_doc_links, rustdoc::bare_urls, rust_2018_idioms)]
 
+use std::fs::OpenOptions;
+
 use clap::{Parser, Subcommand};
 use kube::CustomResourceExt;
 
@@ -44,10 +46,13 @@ async fn main() -> anyhow::Result<()> {
 
     match &command {
         Some(Commands::Manifests) => {
-            println!(
-                "{}",
-                serde_yaml::to_string(&kubit::resources::AppInstance::crd()).unwrap(),
-            );
+            let f = OpenOptions::new()
+                .write(true)
+                .open(kubit::resources::APPINSTANCE_CRD_PATH)
+                .expect("Could not open AppInstances CRD file");
+
+            serde_yaml::to_writer(&f, &kubit::resources::AppInstance::crd()).unwrap();
+
         }
         None => {
             let mut admin = kubert::admin::Builder::from(admin);
