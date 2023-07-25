@@ -4,8 +4,6 @@ use kube::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-pub const APPINSTANCE_CRD_FILE: &str = "kubecfg.dev_appinstances.yaml";
-
 #[derive(CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
 #[kube(
     group = "kubecfg.dev",
