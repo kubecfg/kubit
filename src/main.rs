@@ -54,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
     match &command {
         Some(Commands::Manifests { crd_dir }) => match crd_dir {
             Some(crd_dir) => {
+                // Expand vector as more CRDs are created.
                 for crd in vec![&kubit::resources::AppInstance::crd()] {
                     let crd_path = format!(
                         "{}/{}_{}.yaml",
