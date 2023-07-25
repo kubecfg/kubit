@@ -4,7 +4,7 @@ metadata:
   name: demo
 spec:
   package:
-    image: gcr.io/mkmik-cloud/package-demo:v1
+    image: gcr.io/mkm-cloud/package-demo:v1
     apiVersion: mkmik.pub/v1alpha1
     spec:
       foo: bar
