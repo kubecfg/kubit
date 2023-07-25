@@ -19,7 +19,7 @@ jobs:
       - name: Build
         run: cargo build
       - name: Generate
-        run: cargo run -- manifests
+        run: cargo run -- manifests --crd-dir config/crd/bases
       - name: Diff
         run: test -z "$(git status --porcelain)" || (echo 'Changes detected after generating manifests'; git status; git --no-pager diff; false)
       - name: Run tests
