@@ -52,14 +52,21 @@ async fn main() -> anyhow::Result<()> {
     } = Args::parse();
 
     match &command {
-        Some(Commands::Manifests) => {
-            let f = OpenOptions::new()
-                .write(true)
-                .open(kubit::resources::APPINSTANCE_CRD_PATH)
-                .expect("Could not open AppInstances CRD file");
+        Some(Commands::Manifests { crd_dir }) => {
+            match crd_dir {
+                Some(crd_dir) => {
+                    let crd_path = format!("{}/{}", crd_dir, kubit::resources::APPINSTANCE_CRD_FILE);
 
-            serde_yaml::to_writer(&f, &kubit::resources::AppInstance::crd()).unwrap();
+                    let file = File::create(crd_path)
+                        .expect("Could not open AppInstances CRD file");
 
+                    serde_yaml::to_writer(&file, &kubit::resources::AppInstance::crd())?;
+                }
+                None => println!(
+                    "{}",
+                    serde_yaml::to_string(&kubit::resources::AppInstance::crd()).unwrap(),
+                ),
+            }
         }
         None => {
             let mut admin = kubert::admin::Builder::from(admin);
