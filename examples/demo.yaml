@@ -8,3 +8,7 @@ spec:
     apiVersion: mkmik.pub/v1alpha1
     spec:
       foo: bar
+      nested:
+        stuff:
+          - name: foo
+          - name: bar
