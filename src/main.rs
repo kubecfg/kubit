@@ -1,6 +1,6 @@
 #![deny(rustdoc::broken_intra_doc_links, rustdoc::bare_urls, rust_2018_idioms)]
 
-use std::fs::OpenOptions;
+use std::fs::File;
 
 use clap::{Parser, Subcommand};
 use kube::CustomResourceExt;
@@ -33,7 +33,14 @@ async fn main() -> anyhow::Result<()> {
     #[derive(Clone, Subcommand)]
     enum Commands {
         /// Generates k8s manifests
-        Manifests,
+        Manifests {
+            // Optional directory to write CRDs into
+            #[clap(
+                long,
+                help = "Optional directory to write CRDs into, otherwise write to stdout"
+            )]
+            crd_dir: Option<String>,
+        },
     }
 
     let Args {
