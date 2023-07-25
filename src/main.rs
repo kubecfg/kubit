@@ -50,6 +50,9 @@ async fn main() -> anyhow::Result<()> {
             );
         }
         None => {
+            let mut admin = kubert::admin::Builder::from(admin);
+            admin.with_default_prometheus();
+
             let rt = kubert::Runtime::builder()
                 .with_log(log_level, log_format)
                 .with_admin(admin)
