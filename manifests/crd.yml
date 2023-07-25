@@ -20,6 +20,15 @@ spec:
         properties:
           spec:
             properties:
+              imagePullSecrets:
+                items:
+                  properties:
+                    name:
+                      nullable: true
+                      type: string
+                  type: object
+                nullable: true
+                type: array
               package:
                 properties:
                   apiVersion:
