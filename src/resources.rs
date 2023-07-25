@@ -15,6 +15,14 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct AppInstanceSpec {
     pub package: Package,
+    pub image_pull_secrets: Option<Vec<LocalObjectReference>>,
+}
+
+// Like k8s_openapi::api::core::v1::LocalObjectReference but derives JsonSchema
+// so we can use it here.
+#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
+pub struct LocalObjectReference {
+    pub name: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
