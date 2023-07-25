@@ -19,7 +19,7 @@ jobs:
       - name: Build
         run: cargo build
       - name: Generate
-        run: cargo run -- manifests > config/crd/bases/kubecfg.dev_appinstances.yaml
+        run: cargo run -- manifests
       - name: Diff
         run: test -z "$(git status --porcelain)" || (echo 'Changes detected after generating manifests'; git status; git --no-pager diff; false)
       - name: Run tests
