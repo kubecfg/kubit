@@ -11,7 +11,7 @@ async fn main() -> anyhow::Result<()> {
     #[clap(version)]
     struct Args {
         /// The tracing filter used for logs
-        #[clap(long, env = "SINKER_LOG", default_value = "sinker=info,warn")]
+        #[clap(long, env = "KUBIT_LOG", default_value = "kubit=info,warn")]
         log_level: kubert::LogFilter,
 
         /// The logging format
