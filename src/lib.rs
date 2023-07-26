@@ -4,6 +4,24 @@
 pub enum Error {
     #[error("Kube Error: {0}")]
     KubeError(#[from] kube::Error),
+
+    #[error("OCI error: {0}")]
+    OCIParseError(#[from] oci_distribution::ParseError),
+
+    #[error("OCI error: {0}")]
+    OCIError(#[from] oci_distribution::errors::OciDistributionError),
+
+    #[error("Unsupported manifest type: Index")]
+    UnsupportedManifestIndex,
+
+    #[error("Error decoding package config JSON: {0}")]
+    DecodePackageConfig(serde_json::Error),
+
+    #[error("Error decoding kubecfg pack metadata JSON: {0}")]
+    DecodeKubecfgPackageMetadata(serde_json::Error),
+
+    #[error("Error rendering spec back as JSON: {0}")]
+    RenderSpec(serde_json::Error),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
