@@ -69,7 +69,7 @@ async fn main() -> anyhow::Result<()> {
             None => {
                 for crd in crds {
                     // The YAML delimiter is added in the event we have multiple documents.
-                    println!("---{}", serde_yaml::to_string(&crd).unwrap(),);
+                    println!("---{}", serde_yaml::to_string(&crd).unwrap());
                 }
             }
         },
