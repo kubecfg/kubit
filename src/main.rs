@@ -60,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
     match &command {
         Some(Commands::Manifests { crd_dir }) => {
             for crd in crds {
-                let out_writer = match crd_dir {
+                let mut out_writer = match crd_dir {
                     Some(dir) => {
                         let crd_file = format!("{}_{}.yaml", crd.spec.group, crd.spec.names.plural);
                         let crd_path = PathBuf::from(dir).join(crd_file);
@@ -70,6 +70,8 @@ async fn main() -> anyhow::Result<()> {
                     }
                     None => Box::new(stdout()) as Box<dyn Write>,
                 };
+                // The YAML delimiter is added in the event we have multiple documents.
+                out_writer.write(b"---\n").unwrap();
                 serde_yaml::to_writer(out_writer, &crd).unwrap();
             }
         }
