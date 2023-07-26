@@ -51,11 +51,12 @@ async fn main() -> anyhow::Result<()> {
         command,
     } = Args::parse();
 
+    // Expand vector as more CRDs are created.
+    let crds = vec![kubit::resources::AppInstance::crd()];
     match &command {
         Some(Commands::Manifests { crd_dir }) => match crd_dir {
             Some(crd_dir) => {
-                // Expand vector as more CRDs are created.
-                for crd in vec![&kubit::resources::AppInstance::crd()] {
+                for crd in crds {
                     let crd_file = format!("{}_{}.yaml", crd.spec.group, crd.spec.names.plural);
                     let crd_path = PathBuf::from(crd_dir).join(crd_file);
 
@@ -65,10 +66,11 @@ async fn main() -> anyhow::Result<()> {
                     serde_yaml::to_writer(&file, &kubit::resources::AppInstance::crd())?;
                 }
             }
-            None => println!(
-                "{}",
-                serde_yaml::to_string(&kubit::resources::AppInstance::crd()).unwrap(),
-            ),
+            None => {
+                for crd in crds {
+                    println!("{}---\n", serde_yaml::to_string(&crd).unwrap(),);
+                }
+            }
         },
         None => {
             let mut admin = kubert::admin::Builder::from(admin);
