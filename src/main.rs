@@ -1,6 +1,10 @@
 #![deny(rustdoc::broken_intra_doc_links, rustdoc::bare_urls, rust_2018_idioms)]
 
-use std::{fs::File, path::PathBuf};
+use std::{
+    fs::File,
+    io::{stdout, Write},
+    path::PathBuf,
+};
 
 use clap::{Parser, Subcommand};
 use kube::CustomResourceExt;
@@ -54,25 +58,21 @@ async fn main() -> anyhow::Result<()> {
     // Expand vector as more CRDs are created.
     let crds = vec![kubit::resources::AppInstance::crd()];
     match &command {
-        Some(Commands::Manifests { crd_dir }) => match crd_dir {
-            Some(crd_dir) => {
-                for crd in crds {
-                    let crd_file = format!("{}_{}.yaml", crd.spec.group, crd.spec.names.plural);
-                    let crd_path = PathBuf::from(crd_dir).join(crd_file);
-
-                    let file =
-                        File::create(crd_path).expect("Could not open AppInstances CRD file");
-
-                    serde_yaml::to_writer(&file, &kubit::resources::AppInstance::crd())?;
-                }
+        Some(Commands::Manifests { crd_dir }) => {
+            for crd in crds {
+                let out_writer = match crd_dir {
+                    Some(dir) => {
+                        let crd_file = format!("{}_{}.yaml", crd.spec.group, crd.spec.names.plural);
+                        let crd_path = PathBuf::from(dir).join(crd_file);
+                        let file =
+                            File::create(crd_path).expect("Could not open AppInstances CRD file");
+                        Box::new(file) as Box<dyn Write>
+                    }
+                    None => Box::new(stdout()) as Box<dyn Write>,
+                };
+                serde_yaml::to_writer(out_writer, &crd).unwrap();
             }
-            None => {
-                for crd in crds {
-                    // The YAML delimiter is added in the event we have multiple documents.
-                    println!("---{}", serde_yaml::to_string(&crd).unwrap());
-                }
-            }
-        },
+        }
         None => {
             let mut admin = kubert::admin::Builder::from(admin);
             admin.with_default_prometheus();
