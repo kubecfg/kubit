@@ -64,15 +64,14 @@ async fn main() -> anyhow::Result<()> {
     match &command {
         Some(Commands::Manifests { crd_dir }) => {
             for crd in crds {
-                let mut out_writer = match crd_dir {
+                let mut out_writer: Box<dyn Write> = match crd_dir {
                     Some(dir) => {
                         let crd_file = format!("{}_{}.yaml", crd.spec.group, crd.spec.names.plural);
-                        let crd_path = PathBuf::from(dir).join(crd_file);
-                        let file =
-                            File::create(crd_path).expect("Could not open AppInstances CRD file");
-                        Box::new(file) as Box<dyn Write>
+                        let file = File::create(dir.join(crd_file))
+                            .expect("Could not open AppInstances CRD file");
+                        Box::new(file)
                     }
-                    None => Box::new(stdout()) as Box<dyn Write>,
+                    None => Box::new(stdout()),
                 };
                 // The YAML delimiter is added in the event we have multiple documents.
                 out_writer.write(b"---\n").unwrap();
