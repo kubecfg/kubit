@@ -22,6 +22,9 @@ pub enum Error {
 
     #[error("Error rendering spec back as JSON: {0}")]
     RenderSpec(serde_json::Error),
+
+    #[error("IO Error: {0}")]
+    IOError(#[from] std::io::Error),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -31,3 +34,6 @@ pub mod controller;
 
 /// Resource type definitions.
 pub mod resources;
+
+pub mod apply;
+pub mod render;

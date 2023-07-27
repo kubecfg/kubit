@@ -9,7 +9,7 @@ use std::{
 use clap::{Parser, Subcommand};
 use kube::CustomResourceExt;
 
-use kubit::controller;
+use kubit::{apply, controller, render, resources::AppInstance};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -48,6 +48,24 @@ async fn main() -> anyhow::Result<()> {
             )]
             crd_dir: Option<PathBuf>,
         },
+
+        /// Render scripts for various phases
+        Scripts {
+            /// Path to the file containing a (YAML) AppInstance manifest.
+            #[clap(long)]
+            app_instance: String,
+
+            #[command(subcommand)]
+            script: Scripts,
+        },
+    }
+
+    #[derive(Clone, Subcommand)]
+    enum Scripts {
+        /// Render manifests
+        Render,
+        /// Apply manifests
+        Apply,
     }
 
     let Args {
@@ -76,6 +94,18 @@ async fn main() -> anyhow::Result<()> {
                 // The YAML delimiter is added in the event we have multiple documents.
                 writeln!(out_writer, "---").unwrap();
                 serde_yaml::to_writer(out_writer, &crd).unwrap();
+            }
+        }
+        Some(Commands::Scripts {
+            app_instance,
+            script,
+        }) => {
+            let file = File::open(app_instance)?;
+            let app_instance: AppInstance = serde_yaml::from_reader(file)?;
+            let mut output = stdout().lock();
+            match script {
+                Scripts::Render => render::emit_script(&app_instance, &mut output)?,
+                Scripts::Apply => apply::emit_script(&app_instance, &mut output)?,
             }
         }
         None => {
