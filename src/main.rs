@@ -74,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
                     None => Box::new(stdout()),
                 };
                 // The YAML delimiter is added in the event we have multiple documents.
-                out_writer.write(b"---\n").unwrap();
+                writeln!(out_writer, "---").unwrap();
                 serde_yaml::to_writer(out_writer, &crd).unwrap();
             }
         }
