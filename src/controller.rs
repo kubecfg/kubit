@@ -27,8 +27,8 @@ struct Context {
     kubecfg_image: String,
 }
 
-fn error_policy(sinker: Arc<AppInstance>, error: &Error, _ctx: Arc<Context>) -> Action {
-    let name = sinker.name_any();
+fn error_policy(app_instance: Arc<AppInstance>, error: &Error, _ctx: Arc<Context>) -> Action {
+    let name = app_instance.name_any();
     warn!(?name, %error, "reconcile failed");
     // TODO(mkm): make error requeue duration configurable
     Action::requeue(Duration::from_secs(5))
