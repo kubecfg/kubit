@@ -18,7 +18,7 @@ use serde_json;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, warn};
 
-use crate::{resources::AppInstance, Error, Result};
+use crate::{render, resources::AppInstance, Error, Result};
 
 const PACK_KEY: &str = "pack.kubecfg.dev/v1alpha1";
 
@@ -99,14 +99,14 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
 
     let kubecfg_version = &kubecfg_pack_metadata.version;
     let kubecfg_image = format!("{}:{kubecfg_version}", ctx.kubecfg_image);
-    let entrypoint = format!("oci://{reference}");
-    let overlay_spec =
-        serde_json::to_string(&app_instance.spec.package.spec).map_err(Error::RenderSpec)?;
+
+    let mut buf = vec![];
+    render::emit_script(&app_instance, &mut buf)?;
+    let script = String::from_utf8(buf).unwrap(); // for debug only
+
     info!(
         ?kubecfg_image,
-        entrypoint,
-        overlay_spec,
-        "TODO: create a Job that runs kubecfg and renders the jsonnet artifact"
+        script, "TODO: create a Job that runs kubecfg and renders the jsonnet artifact"
     );
 
     Ok(Action::await_change())
