@@ -37,8 +37,8 @@ spec:
                   image:
                     type: string
                   spec:
-                    additionalProperties: true
                     type: object
+                    x-kubernetes-preserve-unknown-fields: true
                 required:
                 - apiVersion
                 - image

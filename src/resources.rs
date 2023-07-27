@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use kube::CustomResource;
-use schemars::JsonSchema;
+use schemars::{
+    schema::{Schema, SchemaObject},
+    JsonSchema,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
@@ -30,7 +33,22 @@ pub struct LocalObjectReference {
 pub struct Package {
     pub image: String,
     pub api_version: String,
-    pub spec: HashMap<String, serde_json::Value>,
+    pub spec: PackageSpec,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PackageSpec {
+    #[serde(flatten)]
+    #[schemars(schema_with = "preserve_arbitrary")]
+    arbitrary: HashMap<String, serde_json::Value>,
+}
+
+fn preserve_arbitrary(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
+    let mut obj = SchemaObject::default();
+    obj.extensions
+        .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
+    Schema::Object(obj)
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
