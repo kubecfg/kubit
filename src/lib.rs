@@ -21,10 +21,13 @@ pub enum Error {
     DecodeKubecfgPackageMetadata(serde_json::Error),
 
     #[error("Error rendering spec back as JSON: {0}")]
-    RenderSpec(serde_json::Error),
+    RenderOverlay(serde_json::Error),
 
     #[error("IO Error: {0}")]
     IOError(#[from] std::io::Error),
+
+    #[error("Internal error: {0}")]
+    TempfilePersistError(#[from] tempfile::PersistError),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

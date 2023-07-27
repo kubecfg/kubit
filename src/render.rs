@@ -1,10 +1,25 @@
-use crate::{resources::AppInstance, Result};
+use yash_quote::quoted;
+
+use crate::{resources::AppInstance, Error, Result};
 
 /// Generates shell script that will render the manifest
-pub fn emit_script<W>(_app_instance: &AppInstance, w: &mut W) -> Result<()>
+pub fn emit_script<W>(app_instance: &AppInstance, w: &mut W) -> Result<()>
 where
     W: std::io::Write,
 {
-    writeln!(w, "echo TODO")?;
+    let image = &app_instance.spec.package.image;
+
+    let tmp = tempfile::Builder::new().suffix(".json").tempfile()?;
+    let (mut file, path) = tmp.keep()?;
+    serde_json::to_writer(&mut file, &app_instance).map_err(Error::RenderOverlay)?;
+
+    writeln!(w, "#!/bin/bash")?;
+    writeln!(w, "set -euo pipefail")?;
+    writeln!(
+        w,
+        r#"kubecfg show oci://{} --alpha --overlay-code-file appInstance_={}"#,
+        quoted(image),
+        quoted(&path.to_string_lossy()),
+    )?;
     Ok(())
 }
