@@ -1,3 +1,4 @@
+use docker_credential::DockerCredential;
 use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
@@ -70,15 +71,18 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
     info!(image, "fetching image");
 
     let reference: Reference = image.parse()?;
+    info!(?reference, "reference");
+    let credentials = docker_credential::get_credential(reference.registry())?;
+    let DockerCredential::UsernamePassword(username, password ) = credentials else {todo!()};
+    let auth = RegistryAuth::Basic(username, password);
+    // TODO: handle the case of unauthenticated repositories
 
     let client_config = oci_distribution::client::ClientConfig {
         protocol: oci_distribution::client::ClientProtocol::Https,
         ..Default::default()
     };
     let mut client = OCIClient::new(client_config);
-    let (manifest, _) = client
-        .pull_manifest(&reference, &RegistryAuth::Anonymous)
-        .await?;
+    let (manifest, _) = client.pull_manifest(&reference, &auth).await?;
 
     let manifest = match manifest {
         OciManifest::Image(manifest) => manifest,

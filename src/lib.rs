@@ -20,6 +20,9 @@ pub enum Error {
     #[error("Error decoding kubecfg pack metadata JSON: {0}")]
     DecodeKubecfgPackageMetadata(serde_json::Error),
 
+    #[error("Cannot fetch docker credentials: {0}")]
+    CredentialRetrievalError(#[from] docker_credential::CredentialRetrievalError),
+
     #[error("Error rendering spec back as JSON: {0}")]
     RenderOverlay(serde_json::Error),
 
