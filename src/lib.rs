@@ -31,6 +31,9 @@ pub enum Error {
 
     #[error("Internal error: {0}")]
     TempfilePersistError(#[from] tempfile::PersistError),
+
+    #[error("Namespace is required")]
+    NamespaceRequired,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

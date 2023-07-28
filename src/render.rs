@@ -23,3 +23,19 @@ where
     )?;
     Ok(())
 }
+
+pub fn emit_commandline(app_instance: &AppInstance, overlay_file: &str) -> Vec<String> {
+    let image = &app_instance.spec.package.image;
+
+    [
+        "kubecfg",
+        "show",
+        "--alpha",
+        image,
+        "--overlay-code-file",
+        &format!("appInstance_={overlay_file}"),
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect()
+}

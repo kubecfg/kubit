@@ -1,9 +1,14 @@
 use docker_credential::DockerCredential;
 use futures::StreamExt;
+use k8s_openapi::api::{
+    batch::v1::{Job, JobSpec},
+    core::v1::{Container, PodSpec, PodTemplateSpec},
+};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use kube::{
-    api::ListParams,
+    api::{ListParams, PostParams},
+    core::ObjectMeta,
     runtime::{
         controller::{Action, Controller},
         watcher,
@@ -24,6 +29,7 @@ use crate::{render, resources::AppInstance, Error, Result};
 const PACK_KEY: &str = "pack.kubecfg.dev/v1alpha1";
 
 struct Context {
+    client: Client,
     kubecfg_image: String,
 }
 
@@ -42,7 +48,14 @@ pub async fn run(client: Client, kubecfg_image: String) -> Result<()> {
     }
     Controller::new(docs, watcher::Config::default().any_semantic())
         .shutdown_on_signal()
-        .run(reconcile, error_policy, Arc::new(Context { kubecfg_image }))
+        .run(
+            reconcile,
+            error_policy,
+            Arc::new(Context {
+                client,
+                kubecfg_image,
+            }),
+        )
         .filter_map(|x| async move { std::result::Result::ok(x) })
         .for_each(|_| futures::future::ready(()))
         .await;
@@ -101,11 +114,21 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
         serde_json::from_value(config.metadata.get(PACK_KEY).unwrap().clone())
             .map_err(Error::DecodeKubecfgPackageMetadata)?;
 
+    launch_job(&app_instance, &kubecfg_pack_metadata, Arc::clone(&ctx)).await?;
+
+    Ok(Action::await_change())
+}
+
+async fn launch_job(
+    app_instance: &AppInstance,
+    kubecfg_pack_metadata: &KubecfgPackageMetadata,
+    ctx: Arc<Context>,
+) -> Result<()> {
     let kubecfg_version = &kubecfg_pack_metadata.version;
     let kubecfg_image = format!("{}:{kubecfg_version}", ctx.kubecfg_image);
 
     let mut buf = vec![];
-    render::emit_script(&app_instance, &mut buf)?;
+    render::emit_script(app_instance, &mut buf)?;
     let script = String::from_utf8(buf).unwrap(); // for debug only
 
     info!(
@@ -113,5 +136,56 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
         script, "TODO: create a Job that runs kubecfg and renders the jsonnet artifact"
     );
 
-    Ok(Action::await_change())
+    let ns = &app_instance.namespace().ok_or(Error::NamespaceRequired)?;
+    let job_name = format!("kubit-apply-{}", app_instance.name_any());
+
+    let jobs: Api<Job> = Api::namespaced(ctx.client.clone(), ns);
+    let job = Job {
+        metadata: ObjectMeta {
+            name: Some(job_name),
+            namespace: app_instance.namespace().clone(),
+            ..Default::default()
+        },
+        spec: Some(JobSpec {
+            backoff_limit: Some(1),
+            template: PodTemplateSpec {
+                spec: Some(PodSpec {
+                    restart_policy: Some("Never".to_string()),
+                    containers: vec![Container {
+                        name: "kubecfg".to_string(),
+                        image: Some(kubecfg_image.clone()),
+                        command: Some(
+                            // TODO: use render::emit_commandline
+                            ["kubecfg", "version"]
+                                .iter()
+                                .map(|s| s.to_string())
+                                .collect(),
+                        ),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let pp = PostParams::default();
+
+    match jobs.create(&pp, &job).await {
+        Ok(o) => info!(?o, "Created job"),
+        Err(kube::Error::Api(ae)) => match ae.code {
+            409 => info!("job already exist, doing nothing"),
+            _ => return Err(kube::Error::Api(ae).into()),
+        },
+        Err(e) => panic!("API error: {}", e),
+    }
+
+    // TODO:
+    //
+    // 1. if job exists check if it's has terminated and take action
+    // 2. make sure we watch the job as it changes status
+
+    Ok(())
 }
