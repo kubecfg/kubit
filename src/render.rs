@@ -31,7 +31,8 @@ pub fn emit_commandline(app_instance: &AppInstance, overlay_file: &str) -> Vec<S
         "kubecfg",
         "show",
         "--alpha",
-        image,
+        "--reorder=server",
+        &format!("oci://{}", image),
         "--overlay-code-file",
         &format!("appInstance_={overlay_file}"),
     ]
