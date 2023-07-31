@@ -159,13 +159,31 @@ async fn launch_job(
             backoff_limit: Some(1),
             template: PodTemplateSpec {
                 spec: Some(PodSpec {
+                    volumes: Some(vec![Volume {
+                        name: "credentials".to_string(),
+                        secret: Some(SecretVolumeSource {
+                            secret_name: Some("gar-docker-secret".to_string()),
+                            items: Some(vec![KeyToPath {
+                                key: ".dockerconfigjson".to_string(),
+                                path: "config.json".to_string(),
+                                ..Default::default()
+                            }]),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }]),
                     restart_policy: Some("Never".to_string()),
                     containers: vec![Container {
-                        name: "kubecfg".to_string(),
+                        name: "kubecfg-render".to_string(),
                         image: Some(kubecfg_image.clone()),
+                        volume_mounts: Some(vec![VolumeMount {
+                            name: "credentials".to_string(),
+                            mount_path: "/home/nonroot/.docker".to_string(),
+                            ..Default::default()
+                        }]),
                         command: Some(
-                            // TODO: use render::emit_commandline
-                            ["kubecfg", "version"]
+                            // vec!["kubecfg".to_string(), "version".to_string()]
+                            render::emit_commandline(app_instance, overlay_path)
                                 .iter()
                                 .map(|s| s.to_string())
                                 .collect(),
