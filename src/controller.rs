@@ -2,7 +2,9 @@ use docker_credential::DockerCredential;
 use futures::StreamExt;
 use k8s_openapi::api::{
     batch::v1::{Job, JobSpec},
-    core::v1::{Container, PodSpec, PodTemplateSpec},
+    core::v1::{
+        Container, KeyToPath, PodSpec, PodTemplateSpec, SecretVolumeSource, Volume, VolumeMount,
+    },
 };
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
@@ -138,6 +140,13 @@ async fn launch_job(
 
     let ns = &app_instance.namespace().ok_or(Error::NamespaceRequired)?;
     let job_name = format!("kubit-apply-{}", app_instance.name_any());
+
+    let tmp = tempfile::Builder::new().suffix(".json").tempfile()?;
+    let (mut file, path) = tmp.keep()?;
+    serde_json::to_writer(&mut file, &app_instance).map_err(Error::RenderOverlay)?;
+
+    let overlay_path = path.to_str().unwrap();
+    info!("Overlay path: {}", overlay_path);
 
     let jobs: Api<Job> = Api::namespaced(ctx.client.clone(), ns);
     let job = Job {
