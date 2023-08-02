@@ -198,31 +198,52 @@ async fn launch_job(
             backoff_limit: Some(1),
             template: PodTemplateSpec {
                 spec: Some(PodSpec {
-                    volumes: Some(vec![Volume {
-                        name: "credentials".to_string(),
-                        secret: Some(SecretVolumeSource {
-                            secret_name: Some("gar-docker-secret".to_string()),
-                            items: Some(vec![KeyToPath {
-                                key: ".dockerconfigjson".to_string(),
-                                path: "config.json".to_string(),
+                    volumes: Some(vec![
+                        Volume {
+                            name: "credentials".to_string(),
+                            secret: Some(SecretVolumeSource {
+                                secret_name: Some("gar-docker-secret".to_string()),
+                                items: Some(vec![KeyToPath {
+                                    key: ".dockerconfigjson".to_string(),
+                                    path: "config.json".to_string(),
+                                    ..Default::default()
+                                }]),
                                 ..Default::default()
-                            }]),
+                            }),
                             ..Default::default()
-                        }),
-                        ..Default::default()
-                    }]),
+                        },
+                        Volume {
+                            name: "overlay".to_string(),
+                            config_map: Some(ConfigMapVolumeSource {
+                                name: Some(configmap_name),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        },
+                    ]),
                     restart_policy: Some("Never".to_string()),
                     containers: vec![Container {
                         name: "kubecfg-render".to_string(),
                         image: Some(kubecfg_image.clone()),
-                        volume_mounts: Some(vec![VolumeMount {
-                            name: "credentials".to_string(),
-                            mount_path: "/home/nonroot/.docker".to_string(),
+                        env: Some(vec![EnvVar {
+                            name: "DOCKER_CONFIG".to_string(),
+                            value: Some("/.docker".to_string()),
                             ..Default::default()
                         }]),
+                        volume_mounts: Some(vec![
+                            VolumeMount {
+                                name: "credentials".to_string(),
+                                mount_path: "/.docker".to_string(),
+                                ..Default::default()
+                            },
+                            VolumeMount {
+                                name: "overlay".to_string(),
+                                mount_path: "/tmp/overlay".to_string(),
+                                ..Default::default()
+                            },
+                        ]),
                         command: Some(
-                            // vec!["kubecfg".to_string(), "version".to_string()]
-                            render::emit_commandline(app_instance, overlay_path)
+                            render::emit_commandline(app_instance, "/tmp/overlay/overlay.json")
                                 .iter()
                                 .map(|s| s.to_string())
                                 .collect(),
