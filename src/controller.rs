@@ -3,9 +3,13 @@ use futures::StreamExt;
 use k8s_openapi::api::{
     batch::v1::{Job, JobSpec},
     core::v1::{
-        Container, KeyToPath, PodSpec, PodTemplateSpec, SecretVolumeSource, Volume, VolumeMount,
+        ConfigMap, ConfigMapVolumeSource, Container, EnvVar, KeyToPath, PodSpec, PodTemplateSpec,
+        SecretVolumeSource, Volume, VolumeMount,
     },
 };
+use std::collections::hash_map::DefaultHasher;
+use std::collections::BTreeMap;
+use std::hash::{Hash, Hasher};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use kube::{
@@ -116,37 +120,72 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
         serde_json::from_value(config.metadata.get(PACK_KEY).unwrap().clone())
             .map_err(Error::DecodeKubecfgPackageMetadata)?;
 
-    launch_job(&app_instance, &kubecfg_pack_metadata, Arc::clone(&ctx)).await?;
+    let configmap_name = create_configmap_overlay(&app_instance, Arc::clone(&ctx)).await?;
+    launch_job(
+        &app_instance,
+        &kubecfg_pack_metadata,
+        configmap_name,
+        Arc::clone(&ctx),
+    )
+    .await?;
 
     Ok(Action::await_change())
+}
+
+fn calculate_hash<T: Hash>(t: &T) -> u64 {
+    let mut s = DefaultHasher::new();
+    t.hash(&mut s);
+    s.finish()
+}
+
+async fn create_configmap_overlay(app_instance: &AppInstance, ctx: Arc<Context>) -> Result<String> {
+    let overlay_obj = serde_json::to_string(&app_instance).map_err(Error::RenderOverlay)?;
+    let overlay_hash = calculate_hash(&overlay_obj.as_bytes());
+
+    let mut configmap_data: BTreeMap<String, String> = BTreeMap::new();
+    configmap_data.insert("overlay.json".to_string(), overlay_obj);
+
+    let ns = app_instance.clone().namespace().unwrap();
+    let configmap_name = format!("kubit-overlay-{overlay_hash}");
+
+    let configmaps: Api<ConfigMap> = Api::namespaced(ctx.client.clone(), &ns);
+    let cm = ConfigMap {
+        metadata: ObjectMeta {
+            name: Some(configmap_name),
+            namespace: app_instance.namespace().clone(),
+            ..Default::default()
+        },
+        data: Some(configmap_data),
+        ..Default::default()
+    };
+
+    let pp = PostParams::default();
+
+    match configmaps.create(&pp, &cm).await {
+        Ok(o) => info!("Created ConfigMap: {}", o.name_any()),
+        Err(kube::Error::Api(ae)) => match ae.code {
+            409 => info!("configmap already exist, doing nothing"),
+            _ => return Err(kube::Error::Api(ae).into()),
+        },
+        Err(e) => panic!("API error: {}", e),
+    }
+
+    Ok(cm.metadata.name.unwrap())
 }
 
 async fn launch_job(
     app_instance: &AppInstance,
     kubecfg_pack_metadata: &KubecfgPackageMetadata,
+    configmap_name: String,
     ctx: Arc<Context>,
 ) -> Result<()> {
     let kubecfg_version = &kubecfg_pack_metadata.version;
     let kubecfg_image = format!("{}:{kubecfg_version}", ctx.kubecfg_image);
 
-    let mut buf = vec![];
-    render::emit_script(app_instance, &mut buf)?;
-    let script = String::from_utf8(buf).unwrap(); // for debug only
-
-    info!(
-        ?kubecfg_image,
-        script, "TODO: create a Job that runs kubecfg and renders the jsonnet artifact"
-    );
+    info!("Using: {}", kubecfg_image);
 
     let ns = &app_instance.namespace().ok_or(Error::NamespaceRequired)?;
     let job_name = format!("kubit-apply-{}", app_instance.name_any());
-
-    let tmp = tempfile::Builder::new().suffix(".json").tempfile()?;
-    let (mut file, path) = tmp.keep()?;
-    serde_json::to_writer(&mut file, &app_instance).map_err(Error::RenderOverlay)?;
-
-    let overlay_path = path.to_str().unwrap();
-    info!("Overlay path: {}", overlay_path);
 
     let jobs: Api<Job> = Api::namespaced(ctx.client.clone(), ns);
     let job = Job {
