@@ -223,7 +223,7 @@ async fn launch_job(
                     ]),
                     restart_policy: Some("Never".to_string()),
                     containers: vec![Container {
-                        name: "kubecfg-render".to_string(),
+                        name: "kubecfg-show".to_string(),
                         image: Some(kubecfg_image.clone()),
                         env: Some(vec![EnvVar {
                             name: "DOCKER_CONFIG".to_string(),
