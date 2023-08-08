@@ -34,6 +34,9 @@ use crate::{render, resources::AppInstance, Error, Result};
 
 const PACK_KEY: &str = "pack.kubecfg.dev/v1alpha1";
 
+const KUBECTL_IMAGE: &str =
+    "bitnami/kubectl@sha256:055f2bb61a245cf000a0a4f04ca6d7dde96592b04928ca6ae0546de360644498";
+
 struct Context {
     client: Client,
     kubecfg_image: String,
@@ -143,7 +146,7 @@ async fn create_configmap_overlay(app_instance: &AppInstance, ctx: Arc<Context>)
     let overlay_hash = calculate_hash(&overlay_obj.as_bytes());
 
     let mut configmap_data: BTreeMap<String, String> = BTreeMap::new();
-    configmap_data.insert("overlay.json".to_string(), overlay_obj);
+    configmap_data.insert("appinstance.json".to_string(), overlay_obj);
 
     let ns = app_instance.clone().namespace().unwrap();
     let configmap_name = format!("kubit-overlay-{overlay_hash}");
@@ -187,6 +190,52 @@ async fn launch_job(
     let ns = &app_instance.namespace().ok_or(Error::NamespaceRequired)?;
     let job_name = format!("kubit-apply-{}", app_instance.name_any());
 
+    let volumes = vec![
+        Volume {
+            name: "docker".to_string(),
+            secret: Some(SecretVolumeSource {
+                secret_name: Some("gar-docker-secret".to_string()),
+                items: Some(vec![KeyToPath {
+                    key: ".dockerconfigjson".to_string(),
+                    path: "config.json".to_string(),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+        Volume {
+            name: "overlay".to_string(),
+            config_map: Some(ConfigMapVolumeSource {
+                name: Some(configmap_name),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+        Volume {
+            name: "manifests".to_string(),
+            empty_dir: Some(Default::default()),
+            ..Default::default()
+        },
+    ];
+
+    let mk_mount = |name: &str| VolumeMount {
+        name: name.to_string(),
+        mount_path: format!("/{name}"),
+        ..Default::default()
+    };
+
+    let volume_mounts = Some(volumes.iter().map(|v| mk_mount(&v.name)).collect());
+    let container_defaults = Container {
+        volume_mounts: volume_mounts.clone(),
+        env: Some(vec![EnvVar {
+            name: "DOCKER_CONFIG".to_string(),
+            value: Some("/docker".to_string()),
+            ..Default::default()
+        }]),
+        ..Default::default()
+    };
+
     let jobs: Api<Job> = Api::namespaced(ctx.client.clone(), ns);
     let job = Job {
         metadata: ObjectMeta {
@@ -198,57 +247,32 @@ async fn launch_job(
             backoff_limit: Some(1),
             template: PodTemplateSpec {
                 spec: Some(PodSpec {
-                    volumes: Some(vec![
-                        Volume {
-                            name: "credentials".to_string(),
-                            secret: Some(SecretVolumeSource {
-                                secret_name: Some("gar-docker-secret".to_string()),
-                                items: Some(vec![KeyToPath {
-                                    key: ".dockerconfigjson".to_string(),
-                                    path: "config.json".to_string(),
-                                    ..Default::default()
-                                }]),
-                                ..Default::default()
-                            }),
-                            ..Default::default()
-                        },
-                        Volume {
-                            name: "overlay".to_string(),
-                            config_map: Some(ConfigMapVolumeSource {
-                                name: Some(configmap_name),
-                                ..Default::default()
-                            }),
-                            ..Default::default()
-                        },
-                    ]),
                     restart_policy: Some("Never".to_string()),
-                    containers: vec![Container {
-                        name: "kubecfg-show".to_string(),
+                    volumes: Some(volumes),
+                    init_containers: Some(vec![Container {
+                        name: "render-manifests".to_string(),
                         image: Some(kubecfg_image.clone()),
-                        env: Some(vec![EnvVar {
-                            name: "DOCKER_CONFIG".to_string(),
-                            value: Some("/.docker".to_string()),
-                            ..Default::default()
-                        }]),
-                        volume_mounts: Some(vec![
-                            VolumeMount {
-                                name: "credentials".to_string(),
-                                mount_path: "/.docker".to_string(),
-                                ..Default::default()
-                            },
-                            VolumeMount {
-                                name: "overlay".to_string(),
-                                mount_path: "/tmp/overlay".to_string(),
-                                ..Default::default()
-                            },
-                        ]),
+                        command: Some(render::emit_commandline(
+                            app_instance,
+                            "/overlay/appinstance.json",
+                            "/manifests",
+                        )),
+                        ..container_defaults.clone()
+                    }]),
+                    containers: vec![Container {
+                        name: "apply-manifests".to_string(),
+                        image: Some(KUBECTL_IMAGE.to_string()),
                         command: Some(
-                            render::emit_commandline(app_instance, "/tmp/overlay/overlay.json")
-                                .iter()
-                                .map(|s| s.to_string())
-                                .collect(),
+                            [
+                                "/bin/bash",
+                                "-c",
+                                "echo TODO: apply; ls /manifests; sleep 1000h;",
+                            ]
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect(),
                         ),
-                        ..Default::default()
+                        ..container_defaults.clone()
                     }],
                     ..Default::default()
                 }),
