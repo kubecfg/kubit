@@ -4,8 +4,9 @@ use k8s_openapi::api::{
     batch::v1::{Job, JobSpec},
     core::v1::{
         ConfigMap, ConfigMapVolumeSource, Container, EnvVar, KeyToPath, PodSpec, PodTemplateSpec,
-        SecretVolumeSource, Volume, VolumeMount,
+        SecretVolumeSource, ServiceAccount, Volume, VolumeMount,
     },
+    rbac::v1::{PolicyRule, Role, RoleBinding, RoleRef, Subject},
 };
 use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeMap;
@@ -13,7 +14,7 @@ use std::hash::{Hash, Hasher};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use kube::{
-    api::{ListParams, PostParams},
+    api::{ListParams, Patch, PatchParams, PostParams},
     core::ObjectMeta,
     runtime::{
         controller::{Action, Controller},
@@ -30,12 +31,14 @@ use serde_json;
 #[allow(unused_imports)]
 use tracing::{debug, error, info, warn};
 
-use crate::{render, resources::AppInstance, Error, Result};
+use crate::{apply, render, resources::AppInstance, Error, Result};
 
 const PACK_KEY: &str = "pack.kubecfg.dev/v1alpha1";
 
 const KUBECTL_IMAGE: &str =
-    "bitnami/kubectl@sha256:055f2bb61a245cf000a0a4f04ca6d7dde96592b04928ca6ae0546de360644498";
+    "bitnami/kubectl@sha256:d5229eb7ad4fa8e8cb9004e63b6b257fe5c925de4bde9c6fcbee5e758c08cc13";
+
+const APPLIER_SERVICE_ACCOUNT: &str = "kubit-applier";
 
 struct Context {
     client: Client,
@@ -124,6 +127,9 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
             .map_err(Error::DecodeKubecfgPackageMetadata)?;
 
     let configmap_name = create_configmap_overlay(&app_instance, Arc::clone(&ctx)).await?;
+
+    setup_rbac(&app_instance, Arc::clone(&ctx)).await?;
+
     launch_job(
         &app_instance,
         &kubecfg_pack_metadata,
@@ -133,6 +139,88 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
     .await?;
 
     Ok(Action::await_change())
+}
+
+fn handle_resource_exists<R>(res: kube::Result<R>) -> Result<()>
+where
+    R: kube::Resource,
+{
+    match res {
+        Err(kube::Error::Api(ae)) => match ae.code {
+            409 => {
+                info!(
+                    "{} resource already exist, doing nothing",
+                    tynm::type_name::<R>()
+                );
+                Ok(())
+            }
+            _ => Err(kube::Error::Api(ae).into()),
+        },
+        Err(e) => Err(e.into()),
+        Ok(_) => Ok(()),
+    }
+}
+
+async fn setup_rbac(app_instance: &AppInstance, ctx: Arc<Context>) -> Result<()> {
+    let ns = app_instance.clone().namespace().unwrap();
+    let pp = PatchParams::apply("kubit").force();
+
+    let service_account: Api<ServiceAccount> = Api::namespaced(ctx.client.clone(), &ns);
+    let res = ServiceAccount {
+        metadata: ObjectMeta {
+            name: Some(APPLIER_SERVICE_ACCOUNT.to_string()),
+            namespace: app_instance.namespace().clone(),
+            ..Default::default()
+        },
+
+        ..Default::default()
+    };
+    service_account
+        .patch(&res.name_any(), &pp, &Patch::Apply(&res))
+        .await?;
+
+    let role: Api<Role> = Api::namespaced(ctx.client.clone(), &ns);
+    let res = Role {
+        metadata: ObjectMeta {
+            name: Some(APPLIER_SERVICE_ACCOUNT.to_string()),
+            namespace: app_instance.namespace().clone(),
+            ..Default::default()
+        },
+        rules: Some(vec![PolicyRule {
+            api_groups: Some(["*"].iter().map(|s| s.to_string()).collect()),
+            resources: Some(["*"].iter().map(|s| s.to_string()).collect()),
+            verbs: ["create", "update", "get", "list", "patch", "watch"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            ..Default::default()
+        }]),
+    };
+    role.patch(&res.name_any(), &pp, &Patch::Apply(&res))
+        .await?;
+
+    let api: Api<RoleBinding> = Api::namespaced(ctx.client.clone(), &ns);
+    let role_binding = RoleBinding {
+        metadata: ObjectMeta {
+            name: Some(APPLIER_SERVICE_ACCOUNT.to_string()),
+            namespace: app_instance.namespace().clone(),
+            ..Default::default()
+        },
+        role_ref: RoleRef {
+            api_group: "rbac.authorization.k8s.io".to_string(),
+            kind: "Role".to_string(),
+            name: APPLIER_SERVICE_ACCOUNT.to_string(),
+        },
+        subjects: Some(vec![Subject {
+            kind: "ServiceAccount".to_string(),
+            name: APPLIER_SERVICE_ACCOUNT.to_string(),
+            ..Default::default()
+        }]),
+    };
+    api.patch(&role_binding.name_any(), &pp, &Patch::Apply(&role_binding))
+        .await?;
+
+    Ok(())
 }
 
 fn calculate_hash<T: Hash>(t: &T) -> u64 {
@@ -164,14 +252,7 @@ async fn create_configmap_overlay(app_instance: &AppInstance, ctx: Arc<Context>)
 
     let pp = PostParams::default();
 
-    match configmaps.create(&pp, &cm).await {
-        Ok(o) => info!("Created ConfigMap: {}", o.name_any()),
-        Err(kube::Error::Api(ae)) => match ae.code {
-            409 => info!("configmap already exist, doing nothing"),
-            _ => return Err(kube::Error::Api(ae).into()),
-        },
-        Err(e) => panic!("API error: {}", e),
-    }
+    handle_resource_exists(configmaps.create(&pp, &cm).await)?;
 
     Ok(cm.metadata.name.unwrap())
 }
@@ -228,11 +309,18 @@ async fn launch_job(
     let volume_mounts = Some(volumes.iter().map(|v| mk_mount(&v.name)).collect());
     let container_defaults = Container {
         volume_mounts: volume_mounts.clone(),
-        env: Some(vec![EnvVar {
-            name: "DOCKER_CONFIG".to_string(),
-            value: Some("/docker".to_string()),
-            ..Default::default()
-        }]),
+        env: Some(vec![
+            EnvVar {
+                name: "DOCKER_CONFIG".to_string(),
+                value: Some("/docker".to_string()),
+                ..Default::default()
+            },
+            EnvVar {
+                name: "KUBECTL_APPLYSET".to_string(),
+                value: Some("true".to_string()),
+                ..Default::default()
+            },
+        ]),
         ..Default::default()
     };
 
@@ -247,6 +335,7 @@ async fn launch_job(
             backoff_limit: Some(1),
             template: PodTemplateSpec {
                 spec: Some(PodSpec {
+                    service_account: Some(APPLIER_SERVICE_ACCOUNT.to_string()),
                     restart_policy: Some("Never".to_string()),
                     volumes: Some(volumes),
                     init_containers: Some(vec![Container {
@@ -262,16 +351,7 @@ async fn launch_job(
                     containers: vec![Container {
                         name: "apply-manifests".to_string(),
                         image: Some(KUBECTL_IMAGE.to_string()),
-                        command: Some(
-                            [
-                                "/bin/bash",
-                                "-c",
-                                "echo TODO: apply; ls /manifests; sleep 1000h;",
-                            ]
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect(),
-                        ),
+                        command: Some(apply::emit_commandline(app_instance, "/manifests")),
                         ..container_defaults.clone()
                     }],
                     ..Default::default()
@@ -284,14 +364,7 @@ async fn launch_job(
     };
     let pp = PostParams::default();
 
-    match jobs.create(&pp, &job).await {
-        Ok(o) => info!(?o, "Created job"),
-        Err(kube::Error::Api(ae)) => match ae.code {
-            409 => info!("job already exist, doing nothing"),
-            _ => return Err(kube::Error::Api(ae).into()),
-        },
-        Err(e) => panic!("API error: {}", e),
-    }
+    handle_resource_exists(jobs.create(&pp, &job).await)?;
 
     // TODO:
     //
