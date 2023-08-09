@@ -3,14 +3,12 @@ use futures::StreamExt;
 use k8s_openapi::api::{
     batch::v1::{Job, JobSpec},
     core::v1::{
-        ConfigMap, ConfigMapVolumeSource, Container, EnvVar, KeyToPath, PodSpec, PodTemplateSpec,
-        SecretVolumeSource, ServiceAccount, Volume, VolumeMount,
+        Container, EnvVar, KeyToPath, PodSpec, PodTemplateSpec, SecretVolumeSource, ServiceAccount,
+        Volume, VolumeMount,
     },
     rbac::v1::{PolicyRule, Role, RoleBinding, RoleRef, Subject},
 };
-use std::collections::hash_map::DefaultHasher;
-use std::collections::BTreeMap;
-use std::hash::{Hash, Hasher};
+
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use kube::{
@@ -126,17 +124,9 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
         serde_json::from_value(config.metadata.get(PACK_KEY).unwrap().clone())
             .map_err(Error::DecodeKubecfgPackageMetadata)?;
 
-    let configmap_name = create_configmap_overlay(&app_instance, Arc::clone(&ctx)).await?;
-
     setup_rbac(&app_instance, Arc::clone(&ctx)).await?;
 
-    launch_job(
-        &app_instance,
-        &kubecfg_pack_metadata,
-        configmap_name,
-        Arc::clone(&ctx),
-    )
-    .await?;
+    launch_job(&app_instance, &kubecfg_pack_metadata, Arc::clone(&ctx)).await?;
 
     Ok(Action::await_change())
 }
@@ -223,44 +213,9 @@ async fn setup_rbac(app_instance: &AppInstance, ctx: Arc<Context>) -> Result<()>
     Ok(())
 }
 
-fn calculate_hash<T: Hash>(t: &T) -> u64 {
-    let mut s = DefaultHasher::new();
-    t.hash(&mut s);
-    s.finish()
-}
-
-async fn create_configmap_overlay(app_instance: &AppInstance, ctx: Arc<Context>) -> Result<String> {
-    let overlay_obj = serde_json::to_string(&app_instance).map_err(Error::RenderOverlay)?;
-    let overlay_hash = calculate_hash(&overlay_obj.as_bytes());
-
-    let mut configmap_data: BTreeMap<String, String> = BTreeMap::new();
-    configmap_data.insert("appinstance.json".to_string(), overlay_obj);
-
-    let ns = app_instance.clone().namespace().unwrap();
-    let configmap_name = format!("kubit-overlay-{overlay_hash}");
-
-    let configmaps: Api<ConfigMap> = Api::namespaced(ctx.client.clone(), &ns);
-    let cm = ConfigMap {
-        metadata: ObjectMeta {
-            name: Some(configmap_name),
-            namespace: app_instance.namespace().clone(),
-            ..Default::default()
-        },
-        data: Some(configmap_data),
-        ..Default::default()
-    };
-
-    let pp = PostParams::default();
-
-    handle_resource_exists(configmaps.create(&pp, &cm).await)?;
-
-    Ok(cm.metadata.name.unwrap())
-}
-
 async fn launch_job(
     app_instance: &AppInstance,
     kubecfg_pack_metadata: &KubecfgPackageMetadata,
-    configmap_name: String,
     ctx: Arc<Context>,
 ) -> Result<()> {
     let kubecfg_version = &kubecfg_pack_metadata.version;
@@ -287,10 +242,7 @@ async fn launch_job(
         },
         Volume {
             name: "overlay".to_string(),
-            config_map: Some(ConfigMapVolumeSource {
-                name: Some(configmap_name),
-                ..Default::default()
-            }),
+            empty_dir: Some(Default::default()),
             ..Default::default()
         },
         Volume {
@@ -338,16 +290,31 @@ async fn launch_job(
                     service_account: Some(APPLIER_SERVICE_ACCOUNT.to_string()),
                     restart_policy: Some("Never".to_string()),
                     volumes: Some(volumes),
-                    init_containers: Some(vec![Container {
-                        name: "render-manifests".to_string(),
-                        image: Some(kubecfg_image.clone()),
-                        command: Some(render::emit_commandline(
-                            app_instance,
-                            "/overlay/appinstance.json",
-                            "/manifests",
-                        )),
-                        ..container_defaults.clone()
-                    }]),
+                    init_containers: Some(vec![
+                        Container {
+                            name: "fetch-app-instance".to_string(),
+                            image: Some(KUBECTL_IMAGE.to_string()),
+                            command: Some(
+                                ["/bin/bash", "-c"].iter().map(|s| s.to_string()).collect(),
+                            ),
+                            args: Some(vec![render::emit_fetch_app_instance_script(
+                                ns,
+                                &app_instance.name_any(),
+                                "/overlay/appinstance.json",
+                            )]),
+                            ..container_defaults.clone()
+                        },
+                        Container {
+                            name: "render-manifests".to_string(),
+                            image: Some(kubecfg_image.clone()),
+                            command: Some(render::emit_commandline(
+                                app_instance,
+                                "/overlay/appinstance.json",
+                                "/manifests",
+                            )),
+                            ..container_defaults.clone()
+                        },
+                    ]),
                     containers: vec![Container {
                         name: "apply-manifests".to_string(),
                         image: Some(KUBECTL_IMAGE.to_string()),
