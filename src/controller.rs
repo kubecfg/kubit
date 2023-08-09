@@ -1,12 +1,15 @@
 use docker_credential::DockerCredential;
 use futures::StreamExt;
-use k8s_openapi::api::{
-    batch::v1::{Job, JobSpec},
-    core::v1::{
-        Container, EnvVar, KeyToPath, PodSpec, PodTemplateSpec, SecretVolumeSource, ServiceAccount,
-        Volume, VolumeMount,
+use k8s_openapi::{
+    api::{
+        batch::v1::{Job, JobSpec},
+        core::v1::{
+            Container, EnvVar, KeyToPath, PodSpec, PodTemplateSpec, SecretVolumeSource,
+            ServiceAccount, Volume, VolumeMount,
+        },
+        rbac::v1::{PolicyRule, Role, RoleBinding, RoleRef, Subject},
     },
-    rbac::v1::{PolicyRule, Role, RoleBinding, RoleRef, Subject},
+    apimachinery::pkg::apis::meta::v1::OwnerReference,
 };
 
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -18,7 +21,7 @@ use kube::{
         controller::{Action, Controller},
         watcher,
     },
-    Api, Client, ResourceExt,
+    Api, Client, Resource, ResourceExt,
 };
 use oci_distribution::{
     manifest::OciManifest, secrets::RegistryAuth, Client as OCIClient, Reference,
@@ -151,18 +154,24 @@ where
     }
 }
 
+fn owned_by(app_instance: &AppInstance) -> Option<Vec<OwnerReference>> {
+    app_instance.controller_owner_ref(&()).map(|o| vec![o])
+}
+
 async fn setup_rbac(app_instance: &AppInstance, ctx: Arc<Context>) -> Result<()> {
     let ns = app_instance.clone().namespace().unwrap();
     let pp = PatchParams::apply("kubit").force();
 
+    let metadata = ObjectMeta {
+        name: Some(APPLIER_SERVICE_ACCOUNT.to_string()),
+        namespace: app_instance.namespace().clone(),
+        owner_references: owned_by(app_instance),
+        ..Default::default()
+    };
+
     let service_account: Api<ServiceAccount> = Api::namespaced(ctx.client.clone(), &ns);
     let res = ServiceAccount {
-        metadata: ObjectMeta {
-            name: Some(APPLIER_SERVICE_ACCOUNT.to_string()),
-            namespace: app_instance.namespace().clone(),
-            ..Default::default()
-        },
-
+        metadata: metadata.clone(),
         ..Default::default()
     };
     service_account
@@ -171,11 +180,7 @@ async fn setup_rbac(app_instance: &AppInstance, ctx: Arc<Context>) -> Result<()>
 
     let role: Api<Role> = Api::namespaced(ctx.client.clone(), &ns);
     let res = Role {
-        metadata: ObjectMeta {
-            name: Some(APPLIER_SERVICE_ACCOUNT.to_string()),
-            namespace: app_instance.namespace().clone(),
-            ..Default::default()
-        },
+        metadata: metadata.clone(),
         rules: Some(vec![PolicyRule {
             api_groups: Some(["*"].iter().map(|s| s.to_string()).collect()),
             resources: Some(["*"].iter().map(|s| s.to_string()).collect()),
@@ -191,11 +196,7 @@ async fn setup_rbac(app_instance: &AppInstance, ctx: Arc<Context>) -> Result<()>
 
     let api: Api<RoleBinding> = Api::namespaced(ctx.client.clone(), &ns);
     let role_binding = RoleBinding {
-        metadata: ObjectMeta {
-            name: Some(APPLIER_SERVICE_ACCOUNT.to_string()),
-            namespace: app_instance.namespace().clone(),
-            ..Default::default()
-        },
+        metadata: metadata.clone(),
         role_ref: RoleRef {
             api_group: "rbac.authorization.k8s.io".to_string(),
             kind: "Role".to_string(),
@@ -281,6 +282,7 @@ async fn launch_job(
         metadata: ObjectMeta {
             name: Some(job_name),
             namespace: app_instance.namespace().clone(),
+            owner_references: owned_by(app_instance),
             ..Default::default()
         },
         spec: Some(JobSpec {
