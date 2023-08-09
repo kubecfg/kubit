@@ -45,11 +45,3 @@ pub fn emit_commandline(
     .map(|s| s.to_string())
     .collect()
 }
-
-pub fn emit_fetch_app_instance_script(ns: &str, name: &str) -> String {
-    let ns = quoted(ns);
-    let name = quoted(name);
-    format!(
-        "kubectl get appinstances.kubecfg.dev --namespace {ns} {name} -o json >/spec/appinstance.json; echo rendered ok"
-    )
-}
