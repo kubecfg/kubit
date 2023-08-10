@@ -50,7 +50,5 @@ pub fn emit_fetch_app_instance_script(ns: &str, name: &str, output_file: &str) -
     let ns = quoted(ns);
     let name = quoted(name);
     let output_file = quoted(output_file);
-    format!(
-            "kubectl get appinstances.kubecfg.dev --namespace {ns} {name} -o json >{output_file}; echo rendered ok"
-        )
+    format!("kubectl get appinstances.kubecfg.dev --namespace {ns} {name} -o json >{output_file}")
 }
