@@ -6,4 +6,4 @@ resources:
 images:
   - name: controller
     newName: ghcr.io/kubecfg/kubit
-    newTag: latest
+    newTag: v0.0.3
