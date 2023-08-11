@@ -49,6 +49,12 @@ spec:
             type: object
           status:
             nullable: true
+            properties:
+              lastLogs:
+                additionalProperties:
+                  type: string
+                nullable: true
+                type: object
             type: object
         required:
         - spec

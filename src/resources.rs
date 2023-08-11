@@ -53,4 +53,6 @@ fn preserve_arbitrary(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct AppInstanceStatus {}
+pub struct AppInstanceStatus {
+    pub last_logs: Option<HashMap<String, String>>,
+}

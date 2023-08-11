@@ -31,6 +31,8 @@ pub fn emit_commandline(app_instance: &AppInstance, manifests_dir: &str) -> Vec<
         "--applyset",
         &app_instance.name_any(),
         "--force-conflicts",
+        "-v",
+        "2",
     ]
     .iter()
     .map(|s| s.to_string())
