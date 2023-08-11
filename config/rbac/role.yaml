@@ -25,7 +25,7 @@ rules:
     resources:
       - jobs
     verbs:
-      - patch
+      - create
       - get
       - list
       - delete
