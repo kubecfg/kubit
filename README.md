@@ -1,6 +1,12 @@
 # Kubit
 
-### The operatorless operator
+## The operatorless operator
+
+### Usage
+
+- To install the operator, run `kubectl apply -k https://github.com/kubecfg/kubit//kustomize/global?ref=v0.0.3`
+- Install an `AppInstance` `CustomResource` that provides an OCI package and any necessary configuration
+- Watch as the operator pulls the package, and applies the configuration, deploying your services/etc
 
 **¡WORK IN PROGRESS!**
 
@@ -13,7 +19,6 @@
 
 1. Install the kubit operator once
 2. Apply a CR that references a package OCI artifact
-
 
 Example CR:
 
