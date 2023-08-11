@@ -30,6 +30,14 @@ rules:
       - list
       - delete
       - watch
+  # The kubit operator needs to access the image pull secret references by the AppInstance CR so it
+  # can access the package metadata and validate the spec json schema.
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
   # The instance specific applier job needs to have permissions
   # to create resources in the target namespace. The kubit operator will create
   # instance-specific RBAC rules for the applier job to use.
