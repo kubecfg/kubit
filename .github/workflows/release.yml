@@ -1,15 +1,12 @@
 name: Release
 
 on:
-  workflow_run:
-    workflows:
-      - "Rust"
-    types:
-      - completed
+  push:
+    tags:
+      - v*.*.*
 
 jobs:
   create_release:
-    if: ${{ (github.event.workflow_run.conclusion == 'success') && (startsWith(github.ref, 'refs/tags/v')) }} # Skip if Rust workflow fails
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3
@@ -27,13 +24,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref }}
+          tag_name: ${{ github.ref_name }}
+          release_name: ${{ github.ref_name }}
           draft: true
           prerelease: false
 
   release_image:
-    if: ${{ (github.event.workflow_run.conclusion == 'success') && (startsWith(github.ref, 'refs/tags/v')) }} # Skip if Rust workflow fails
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3
