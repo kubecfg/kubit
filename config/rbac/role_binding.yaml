@@ -1,11 +1,12 @@
-kind: RoleBinding
+kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: kubit
 subjects:
-- kind: ServiceAccount
-  name: kubit
+  - kind: ServiceAccount
+    name: kubit
+    namespace: kubit
 roleRef:
-  kind: Role
+  kind: ClusterRole
   name: kubit
   apiGroup: rbac.authorization.k8s.io
