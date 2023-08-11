@@ -50,6 +50,7 @@ jobs:
           context: .
           push: false
           tags: ghcr.io/kubecfg/kubit:latest
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Push
@@ -58,6 +59,7 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/kubecfg/kubit:latest
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
         if: github.event_name != 'pull_request'
