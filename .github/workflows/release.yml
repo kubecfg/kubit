@@ -9,7 +9,7 @@ on:
 
 jobs:
   create_release:
-    if: ${{ (github.event.workflow_run.conclusion == 'success') && startsWith(github.ref, 'refs/tags/v') }} # Skip if Rust workflow fails
+    if: ${{ (github.event.workflow_run.conclusion == 'success') && (startsWith(github.ref, 'refs/tags/v')) }} # Skip if Rust workflow fails
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3
@@ -33,7 +33,7 @@ jobs:
           prerelease: false
 
   release_image:
-    if: ${{ (github.event.workflow_run.conclusion == 'success') && startsWith(github.ref, 'refs/tags/v' }} # Skip if Rust workflow fails
+    if: ${{ (github.event.workflow_run.conclusion == 'success') && (startsWith(github.ref, 'refs/tags/v')) }} # Skip if Rust workflow fails
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3
