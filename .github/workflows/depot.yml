@@ -1,0 +1,27 @@
+name: Depot
+
+on:
+  push:
+    branches: ["main"]
+    tags:
+      - v*.*.*
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Permissions to use OIDC token authentication
+    permissions:
+      contents: read
+      id-token: write
+      # Allows pushing to the GitHub Container Registry
+      packages: write
+    steps:
+      - uses: actions/checkout@v3
+      - uses: depot/setup-action@v1
+      - uses: depot/build-push-action@v1
+        with:
+          project: vz2l70b5lw
+          context: .
+          platforms: linux/amd64,linux/arm64
