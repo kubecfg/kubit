@@ -46,7 +46,11 @@ rules:
     resources:
       - serviceaccounts
     verbs:
+      - create
       - patch
+      - update
+      - list
+      - get
       - delete
   - apiGroups:
       - rbac.authorization.k8s.io
@@ -66,3 +70,7 @@ rules:
     verbs:
       - list
       - get
+  # we need to have the same permissions the jobs has otherwise we cannot create the RBAC
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["create", "update", "get", "list", "patch", "watch"]
