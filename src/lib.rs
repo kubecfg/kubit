@@ -20,9 +20,6 @@ pub enum Error {
     #[error("Error decoding kubecfg pack metadata JSON: {0}")]
     DecodeKubecfgPackageMetadata(serde_json::Error),
 
-    #[error("Cannot fetch docker credentials: {0}")]
-    CredentialRetrievalError(#[from] docker_credential::CredentialRetrievalError),
-
     #[error("Error rendering spec back as JSON: {0}")]
     RenderOverlay(serde_json::Error),
 
@@ -34,6 +31,18 @@ pub enum Error {
 
     #[error("Namespace is required")]
     NamespaceRequired,
+
+    #[error(".spec.imagePullSecret currently requires to have exactly one pull secret")]
+    UnsupportedMultipleImagePullSecrets,
+
+    #[error("Image pull secret doesn't contain .dockerconfigjson")]
+    NoDockerConfigJsonInImagePullSecret,
+
+    #[error("Error decoding docker config JSON: {0}")]
+    DecodeDockerConfig(#[from] docker_config::Error),
+
+    #[error("Unsupported image pull secret type: {0:?}, should be kubernetes.io/dockerconfigjson")]
+    BadImagePullSecretType(Option<String>),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -46,3 +55,5 @@ pub mod resources;
 
 pub mod apply;
 pub mod render;
+
+mod docker_config;

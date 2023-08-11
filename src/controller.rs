@@ -1,11 +1,11 @@
-use docker_credential::DockerCredential;
 use futures::StreamExt;
+use itertools::Itertools;
 use k8s_openapi::{
     api::{
         batch::v1::{Job, JobSpec},
         core::v1::{
-            Container, EnvVar, KeyToPath, Pod, PodSpec, PodTemplateSpec, SecretVolumeSource,
-            ServiceAccount, Volume, VolumeMount,
+            Container, EnvVar, KeyToPath, Pod, PodSpec, PodTemplateSpec, Secret,
+            SecretVolumeSource, ServiceAccount, Volume, VolumeMount,
         },
         rbac::v1::{PolicyRule, Role, RoleBinding, RoleRef, Subject},
     },
@@ -32,7 +32,9 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    apply, render,
+    apply,
+    docker_config::DockerConfig,
+    render,
     resources::{AppInstance, AppInstanceStatus},
     Error, Result,
 };
@@ -199,16 +201,51 @@ async fn reconciliation_state(
     })
 }
 
-async fn fetch_package_config(app_instance: &AppInstance) -> Result<PackageConfig> {
+async fn get_image_pull_secrets(app_instance: &AppInstance, ctx: &Context) -> Result<RegistryAuth> {
+    info!("getting image pull credentials");
+
+    let secret_name = {
+        let Some(ref refs) = app_instance.spec.image_pull_secrets else {
+            return Ok(RegistryAuth::Anonymous)
+        };
+        if refs.is_empty() {
+            return Ok(RegistryAuth::Anonymous);
+        }
+        refs.iter()
+            .exactly_one()
+            .map_err(|_| Error::UnsupportedMultipleImagePullSecrets)?
+            .name
+            .as_ref()
+            .expect("schema validation would have enforced this")
+    };
+
+    let ns = &app_instance.namespace().ok_or(Error::NamespaceRequired)?;
+    let secrets: Api<Secret> = Api::namespaced(ctx.client.clone(), ns);
+    let secret = secrets.get(secret_name).await?;
+
+    if secret.type_ != Some("kubernetes.io/dockerconfigjson".to_string()) {
+        return Err(Error::BadImagePullSecretType(secret.type_));
+    }
+
+    let docker_config = secret
+        .data
+        .as_ref()
+        .and_then(|data| data.get(".dockerconfigjson"))
+        .ok_or(Error::NoDockerConfigJsonInImagePullSecret)?;
+
+    let docker_config = DockerConfig::from_slice(&docker_config.0)?;
+
+    let reference: Reference = app_instance.spec.package.image.parse()?;
+    Ok(docker_config.get_auth(reference.registry())?)
+}
+
+async fn fetch_package_config(app_instance: &AppInstance, ctx: &Context) -> Result<PackageConfig> {
     let image = &app_instance.spec.package.image;
     info!(image, "fetching image");
 
     let reference: Reference = image.parse()?;
     info!(?reference, "reference");
-    let credentials = docker_credential::get_credential(reference.registry())?;
-    let DockerCredential::UsernamePassword(username, password ) = credentials else {todo!()};
-    let auth = RegistryAuth::Basic(username, password);
-    // TODO: handle the case of unauthenticated repositories
+    let auth = get_image_pull_secrets(app_instance, ctx).await?;
 
     let client_config = oci_distribution::client::ClientConfig {
         protocol: oci_distribution::client::ClientProtocol::Https,
@@ -319,7 +356,7 @@ async fn setup_job_rbac(app_instance: &AppInstance, ctx: &Context) -> Result<()>
 async fn launch_job(app_instance: &AppInstance, ctx: &Context) -> Result<()> {
     setup_job_rbac(app_instance, ctx).await?;
 
-    let package_config: PackageConfig = fetch_package_config(app_instance).await?;
+    let package_config: PackageConfig = fetch_package_config(app_instance, ctx).await?;
     info!(?package_config, "got package config");
 
     let kubecfg_image = package_config.versioned_kubecfg_image(ctx)?;
