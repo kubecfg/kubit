@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  workflow_run:
+    worfklows:
+      - "Rust"
+  types:
+    - completed
+  push:
+    tags:
+      - v*.*.*
+jobs:
+  create_release:
+    if: ${{ (github.event.workflow_run.conclusion == 'success') }} # Skip if Rust workflow fails
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # renovate: tag=v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+          draft: true
+          prerelease: false
+
+  release_image:
+    if: ${{ (github.event.workflow_run.conclusion == 'success') }} # Skip if Rust workflow fails
+    runs-on: ubuntu-latest
+    steps:
+      - name: Release
+        uses: docker/build-push-action@2eb1c1961a95fc15694676618e422e8ba1d63825 # v4
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/kubecfg/kubit:${{ github.ref_name }}
+          cache-from: type=gha
