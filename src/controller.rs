@@ -65,6 +65,7 @@ pub async fn run(client: Client, kubecfg_image: String) -> Result<()> {
         std::process::exit(1);
     }
 
+    info!("running kubit manager");
     let jobs = Api::<Job>::all(client.clone());
     Controller::new(docs, watcher::Config::default().any_semantic())
         .shutdown_on_signal()
