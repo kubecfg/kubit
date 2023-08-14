@@ -9,7 +9,7 @@ jobs:
     steps:
       - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3
       - name: Install action-validator with asdf
-        uses: asdf-vm/actions/install@v2
+        uses: asdf-vm/actions/install@6a442392015fbbdd8b48696d41e0051b2698b2e4 # v2
         with:
           tool_versions: |
             action-validator 0.5.3

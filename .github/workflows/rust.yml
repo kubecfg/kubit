@@ -42,7 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3
       - name: Set up Depot Docker Build
-        uses: depot/setup-action@v1
+        uses: depot/setup-action@b6821033ac2e40632f45def8e8a4f158c6f60980 # v1
       - name: Login to GHCR
         uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc # v2
         with:
@@ -52,7 +52,7 @@ jobs:
         if: github.event_name != 'pull_request'
 
       - name: Build
-        uses: depot/build-push-action@v1
+        uses: depot/build-push-action@39acb3f766a908058e746f5c7a166f73e4cdcb17 # v1
         with:
           project: vz2l70b5lw
           context: .
@@ -60,7 +60,7 @@ jobs:
           push: false
           tags: ghcr.io/kubecfg/kubit:latest
       - name: Push
-        uses: depot/build-push-action@v1
+        uses: depot/build-push-action@39acb3f766a908058e746f5c7a166f73e4cdcb17 # v1
         with:
           project: vz2l70b5lw
           context: .
@@ -76,7 +76,7 @@ jobs:
     steps:
       - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3
       - name: Set up Depot Docker Build
-        uses: depot/setup-action@v1
+        uses: depot/setup-action@b6821033ac2e40632f45def8e8a4f158c6f60980 # v1
       - name: Login to GHCR
         uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc # v2
         with:
