@@ -2,11 +2,11 @@ name: Rust
 
 on:
   push:
-    branches: ["main"]
-    tags:
-      - v*.*.*
+    branches: ["ci/use-depot-for-release"]
+      # tags:
+      #   - v*.*.*
   pull_request:
-    branches: ["main"]
+    branches: ["ci/use-depot-for-release"]
 env:
   CARGO_TERM_COLOR: always
 
