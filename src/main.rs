@@ -51,21 +51,23 @@ async fn main() -> anyhow::Result<()> {
 
         /// Render scripts for various phases
         Scripts {
-            /// Path to the file containing a (YAML) AppInstance manifest.
-            #[clap(long)]
-            app_instance: String,
-
             #[command(subcommand)]
             script: Scripts,
         },
     }
 
+    #[derive(Clone, Parser)]
+    struct ScriptArgs {
+        /// Path to the file containing a (YAML) AppInstance manifest.
+        app_instance: String,
+    }
+
     #[derive(Clone, Subcommand)]
     enum Scripts {
         /// Render manifests
-        Render,
+        Render(ScriptArgs),
         /// Apply manifests
-        Apply,
+        Apply(ScriptArgs),
     }
 
     let Args {
@@ -96,16 +98,14 @@ async fn main() -> anyhow::Result<()> {
                 serde_yaml::to_writer(out_writer, &crd).unwrap();
             }
         }
-        Some(Commands::Scripts {
-            app_instance,
-            script,
-        }) => {
-            let file = File::open(app_instance)?;
-            let app_instance: AppInstance = serde_yaml::from_reader(file)?;
+        Some(Commands::Scripts { script }) => {
+            fn app_instance(args: &ScriptArgs) -> anyhow::Result<AppInstance> {
+                Ok(serde_yaml::from_reader(File::open(&args.app_instance)?)?)
+            }
             let mut output = stdout().lock();
             match script {
-                Scripts::Render => render::emit_script(&app_instance, &mut output)?,
-                Scripts::Apply => apply::emit_script(&app_instance, &mut output)?,
+                Scripts::Render(args) => render::emit_script(&app_instance(args)?, &mut output)?,
+                Scripts::Apply(args) => apply::emit_script(&app_instance(args)?, &mut output)?,
             }
         }
         None => {
