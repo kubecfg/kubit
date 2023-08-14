@@ -4,7 +4,7 @@
 
 ### Usage
 
-- To install the operator, run `kubectl apply -k https://github.com/kubecfg/kubit//kustomize/global?ref=v0.0.3`
+- To install the operator, run `kubectl apply -k https://github.com/kubecfg/kubit//kustomize/global?ref=v0.0.4`
 - Install an `AppInstance` `CustomResource` that provides an OCI package and any necessary configuration
 - Watch as the operator pulls the package, and applies the configuration, deploying your services/etc
 
