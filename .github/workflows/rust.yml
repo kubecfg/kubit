@@ -74,6 +74,13 @@ jobs:
       #   if: github.event_name != 'pull_request'
 
   release:
+
+    permissions:
+      contents: read
+      id-token: write
+      # Allows pushing to the GitHub Container Registry
+      packages: write
+
     needs: [pack, build]
     # if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
