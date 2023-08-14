@@ -54,7 +54,7 @@ jobs:
       - name: Build
         uses: depot/build-push-action@39acb3f766a908058e746f5c7a166f73e4cdcb17 # v1
         with:
-          project: vz2l70b5lw
+          project: v8n5whjnsb
           context: .
           platforms: linux/amd64,linux/arm64
           push: false
@@ -62,7 +62,7 @@ jobs:
       - name: Push
         uses: depot/build-push-action@39acb3f766a908058e746f5c7a166f73e4cdcb17 # v1
         with:
-          project: vz2l70b5lw
+          project: v8n5whjnsb
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
@@ -93,7 +93,7 @@ jobs:
       - name: release_image
         uses: depot/build-push-action@39acb3f766a908058e746f5c7a166f73e4cdcb17 # v1
         with:
-          project: vz2l70b5lw
+          project: v8n5whjnsb
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
