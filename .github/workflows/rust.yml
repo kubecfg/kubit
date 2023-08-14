@@ -70,6 +70,13 @@ jobs:
         if: github.event_name != 'pull_request'
 
   release:
+
+    # Allow depot permissions to GHCR
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+
     needs: [pack, build]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -94,7 +101,7 @@ jobs:
           draft: true
           prerelease: false
       - name: release_image
-        uses: docker/build-push-action@2eb1c1961a95fc15694676618e422e8ba1d63825 # v4
+        uses: depot/build-push-action@39acb3f766a908058e746f5c7a166f73e4cdcb17 # v1
         with:
           project: vz2l70b5lw
           context: .
