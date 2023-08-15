@@ -11,7 +11,11 @@ where
     let (mut file, path) = tmp.keep()?;
     serde_json::to_writer(&mut file, &app_instance).map_err(Error::RenderOverlay)?;
 
-    let script = script(app_instance, &path.to_string_lossy(), "/tmp/manifests")?;
+    let script = script(
+        app_instance,
+        &path.to_string_lossy(),
+        Some("/tmp/manifests"),
+    )?;
     writeln!(w, "{script}")?;
     Ok(())
 }
@@ -20,7 +24,7 @@ where
 pub fn script(
     app_instance: &AppInstance,
     overlay_file_name: &str,
-    output_dir: &str,
+    output_dir: Option<&str>,
 ) -> Result<Script> {
     let tokens = emit_commandline(app_instance, overlay_file_name, output_dir);
     Ok(Script::from_vec(tokens))
@@ -29,11 +33,11 @@ pub fn script(
 pub fn emit_commandline(
     app_instance: &AppInstance,
     overlay_file: &str,
-    output_dir: &str,
+    output_dir: Option<&str>,
 ) -> Vec<String> {
     let image = &app_instance.spec.package.image;
 
-    [
+    let mut cli = [
         "kubecfg",
         "show",
         "--alpha",
@@ -41,14 +45,25 @@ pub fn emit_commandline(
         &format!("oci://{image}"),
         "--overlay-code-file",
         &format!("appInstance_={overlay_file}"),
-        "--export-dir",
-        output_dir,
-        "--export-filename-format",
-        "{{printf \"%03d\" (resourceIndex .)}}-{{.apiVersion}}.{{.kind}}-{{default \"default\" .metadata.namespace}}.{{.metadata.name}}",
     ]
     .iter()
     .map(|s| s.to_string())
-    .collect()
+    .collect::<Vec<String>>();
+
+    if let Some(output_dir) = output_dir {
+        const FORMAT: &str = "{{printf \"%03d\" (resourceIndex .)}}-{{.apiVersion}}.{{.kind}}-{{default \"default\" .metadata.namespace}}.{{.metadata.name}}";
+        let out = [
+            "--export-dir",
+            output_dir,
+            "--export-filename-format",
+            FORMAT,
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<String>>();
+        cli.extend(out);
+    }
+    cli
 }
 
 pub fn emit_fetch_app_instance_script(ns: &str, name: &str, output_file: &str) -> String {

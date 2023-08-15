@@ -480,7 +480,7 @@ async fn create_job(
                             command: Some(render::emit_commandline(
                                 app_instance,
                                 "/overlay/appinstance.json",
-                                "/manifests",
+                                Some("/manifests"),
                             )),
                             ..container_defaults.clone()
                         },

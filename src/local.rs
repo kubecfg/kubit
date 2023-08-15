@@ -26,10 +26,9 @@ pub fn apply(app_instance: &str, dry_run: &Option<DryRun>) -> Result<()> {
     let app_instance: AppInstance = serde_yaml::from_reader(file)?;
 
     let steps = vec![
-        Script::from_str("manifests=$(mktemp -d)"),
         Script::from_str("export KUBECTL_APPLYSET=true"),
-        render::script(&app_instance, overlay_file_name, "${manifests}")?,
-        apply::script(&app_instance, "${manifests}")?,
+        render::script(&app_instance, overlay_file_name, None)?
+            | apply::script(&app_instance, "-")?,
     ];
     let script: Script = steps.into_iter().sum();
 
