@@ -1,6 +1,8 @@
 use crate::{resources::AppInstance, scripting::Script, Result};
 use kube::ResourceExt;
 
+pub const KUBIT_APPLIER_FIELD_MANAGER: &str = "kubit-applier";
+
 /// Generates shell script that will apply the manifests and writes it to w
 pub fn emit_script<W>(app_instance: &AppInstance, w: &mut W) -> Result<()>
 where
@@ -29,6 +31,8 @@ pub fn emit_commandline(app_instance: &AppInstance, manifests_dir: &str) -> Vec<
         "--prune",
         "--applyset",
         &app_instance.name_any(),
+        "--field-manager",
+        KUBIT_APPLIER_FIELD_MANAGER,
         "--force-conflicts",
         "-v=2",
     ]
