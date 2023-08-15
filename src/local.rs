@@ -8,6 +8,7 @@ use crate::{apply, render, resources::AppInstance, scripting::Script};
 
 #[derive(Clone, clap::ValueEnum)]
 pub enum DryRun {
+    Render,
     Script,
 }
 
@@ -28,7 +29,10 @@ pub fn apply(app_instance: &str, dry_run: &Option<DryRun>) -> Result<()> {
     let steps = vec![
         Script::from_str("export KUBECTL_APPLYSET=true"),
         render::script(&app_instance, overlay_file_name, None)?
-            | apply::script(&app_instance, "-")?,
+            | match dry_run {
+                Some(DryRun::Render) => Script::from_str("cat"),
+                _ => apply::script(&app_instance, "-")?,
+            },
     ];
     let script: Script = steps.into_iter().sum();
 
