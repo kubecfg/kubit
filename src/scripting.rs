@@ -18,6 +18,10 @@ impl Script {
                 .join(" \\\n    "),
         )
     }
+
+    pub fn subshell(&self) -> Self {
+        Self(format!("({})", self.0))
+    }
 }
 
 // Quote all strings expect for explicit bash variable references
