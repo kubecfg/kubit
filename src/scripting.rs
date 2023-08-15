@@ -47,6 +47,14 @@ impl ops::Add<Script> for Script {
     }
 }
 
+impl ops::BitOr<Script> for Script {
+    type Output = Script;
+
+    fn bitor(self, rhs: Script) -> Self::Output {
+        Script(format!("{} \\\n| {}", self.0, rhs.0))
+    }
+}
+
 impl Sum for Script {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         match iter.reduce(|lhs, rhs| lhs + rhs) {
@@ -149,6 +157,22 @@ set -euo pipefail
 echo \
     'quote_$_me' \
     "${dont_quote_me}""#;
+        assert_eq!(format!("{script}"), expected);
+    }
+
+    #[test]
+    fn test_pipe() {
+        let left = Script::from_vec(["echo", "foo"].into_iter().map(|x| x.to_string()).collect());
+        let right = Script::from_vec(["wc", "-c"].into_iter().map(|x| x.to_string()).collect());
+
+        let script = left | right;
+        let expected = r#"#!/bin/bash
+set -euo pipefail
+
+echo \
+    foo \
+| wc \
+    -c"#;
         assert_eq!(format!("{script}"), expected);
     }
 }
