@@ -9,7 +9,7 @@ use std::{
 use clap::{Parser, Subcommand};
 use kube::CustomResourceExt;
 
-use kubit::{apply, controller, render, resources::AppInstance};
+use kubit::{apply, controller, local, render, resources::AppInstance};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -58,6 +58,16 @@ async fn main() -> anyhow::Result<()> {
             #[command(subcommand)]
             script: Scripts,
         },
+
+        /// Applies the template locally
+        Apply {
+            /// Path to the file containing a (YAML) AppInstance manifest.
+            app_instance: String,
+
+            /// Dry run
+            #[clap(long)]
+            dry_run: Option<local::DryRun>,
+        },
     }
 
     #[derive(Clone, Subcommand)]
@@ -95,6 +105,12 @@ async fn main() -> anyhow::Result<()> {
                 writeln!(out_writer, "---").unwrap();
                 serde_yaml::to_writer(out_writer, &crd).unwrap();
             }
+        }
+        Some(Commands::Apply {
+            app_instance,
+            dry_run,
+        }) => {
+            local::apply(app_instance, dry_run)?;
         }
         Some(Commands::Scripts {
             app_instance,

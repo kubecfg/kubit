@@ -54,6 +54,8 @@ pub mod controller;
 pub mod resources;
 
 pub mod apply;
+pub mod local;
 pub mod render;
+mod scripting;
 
 mod docker_config;
