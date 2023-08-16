@@ -113,3 +113,11 @@ kubit local apply foo.yaml --dry-run=script
 Other interesting options are `--dry-run=render` and `--dry-run=diff` which will respectively just render the YAML without applying it
 and rendering + diffing the manifests against a running application. This can be useful to preview effects of changes in the spec or
 between versions of a package
+
+### Trying local package changes
+
+Sometimes you'd like to try out some jsonnet code before you package it up and publish to your OCI registry:
+
+```bash
+kubit local apply foo.yaml --dry-run=diff --package-image file://$HOME/my-project/my-main.jsonnet
+```
