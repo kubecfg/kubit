@@ -61,13 +61,13 @@ and update the outcome of the reconciliation in the `status` field of the `AppIn
 You can observe the `status` field of the `AppInstance` resource using standard Kubernetes tooling such as:
 
 ```bash
-kubectl get appinstances foo -o json | jq .status
+kubectl get -f foo.yaml -o json | jq .status
 ```
 
 TIP: render logs in more readable format with:
 
 ```bash
-kubectl get appinstances foo -o json | jq -r '.status.lastLogs|to_entries[] | "\(.key): \(.value)"'
+kubectl get -f foo.yaml -o json | jq -r '.status.lastLogs|to_entries[] | "\(.key): \(.value)"'
 ```
 
 ### Creating a new package
