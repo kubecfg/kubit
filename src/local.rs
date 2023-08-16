@@ -1,4 +1,5 @@
 use anyhow::Result;
+use clap::Subcommand;
 use kube::ResourceExt;
 use std::fs::{self, File};
 use std::io::{stdout, Write};
@@ -12,11 +13,36 @@ use crate::{
     scripting::Script,
 };
 
+#[derive(Clone, Subcommand)]
+pub enum Local {
+    /// Applies the template locally
+    Apply {
+        /// Path to the file containing a (YAML) AppInstance manifest.
+        app_instance: String,
+
+        /// Dry run
+        #[clap(long)]
+        dry_run: Option<DryRun>,
+    },
+}
+
 #[derive(Clone, clap::ValueEnum)]
 pub enum DryRun {
     Render,
     Diff,
     Script,
+}
+
+pub fn run(local: &Local) -> Result<()> {
+    match local {
+        Local::Apply {
+            app_instance,
+            dry_run,
+        } => {
+            apply(app_instance, dry_run)?;
+        }
+    };
+    Ok(())
 }
 
 /// Generate a script that runs kubecfg show and kubectl apply and runs it.

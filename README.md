@@ -85,7 +85,7 @@ You can run the same logic that the kubit controller does when rendering and app
 the `kubit` CLI tool from your laptop:
 
 ```bash
-kubit apply foo.yaml
+kubit local apply foo.yaml
 ```
 
 Kubit is just a relatively thin wrapper on top of `kubecfg`.
@@ -95,7 +95,7 @@ tooling rather than kubecfg's integrated k8s API.
 You can preview the actuall commands that `kubit` will run with:
 
 ```bash
-kubit apply foo.yaml --dry-run=script
+kubit local apply foo.yaml --dry-run=script
 ```
 
 Other interesting options are `--dry-run=render` and `--dry-run=diff` which will respectively just render the YAML without applying it

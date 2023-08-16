@@ -59,14 +59,10 @@ async fn main() -> anyhow::Result<()> {
             script: Scripts,
         },
 
-        /// Applies the template locally
-        Apply {
-            /// Path to the file containing a (YAML) AppInstance manifest.
-            app_instance: String,
-
-            /// Dry run
-            #[clap(long)]
-            dry_run: Option<local::DryRun>,
+        /// Run operator logic locally from the CLI
+        Local {
+            #[command(subcommand)]
+            local: local::Local,
         },
     }
 
@@ -106,12 +102,7 @@ async fn main() -> anyhow::Result<()> {
                 serde_yaml::to_writer(out_writer, &crd).unwrap();
             }
         }
-        Some(Commands::Apply {
-            app_instance,
-            dry_run,
-        }) => {
-            local::apply(app_instance, dry_run)?;
-        }
+        Some(Commands::Local { local }) => local::run(local)?,
         Some(Commands::Scripts {
             app_instance,
             script,
