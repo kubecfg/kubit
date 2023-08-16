@@ -16,7 +16,7 @@ COPY . .
 RUN cargo build --release --bin kubit
 
 # We do not need the Rust toolchain to run the binary!
-FROM debian:bullseye-slim@sha256:59a751b3f0aaa097b42ebc19a0c429e80cf4d6b861fbe1453b9948aa5fa41200 AS runtime
+FROM debian:bullseye-slim@sha256:61386e11b5256efa33823cbfafd668dd651dbce810b24a8fb7b2e32fa7f65a85 AS runtime
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
