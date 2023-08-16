@@ -23,6 +23,10 @@ pub enum Local {
         /// Dry run
         #[clap(long)]
         dry_run: Option<DryRun>,
+
+        /// Override the package image field in the spec
+        #[clap(long)]
+        package_image: Option<String>,
     },
 }
 
@@ -38,15 +42,20 @@ pub fn run(local: &Local) -> Result<()> {
         Local::Apply {
             app_instance,
             dry_run,
+            package_image,
         } => {
-            apply(app_instance, dry_run)?;
+            apply(app_instance, dry_run, package_image)?;
         }
     };
     Ok(())
 }
 
 /// Generate a script that runs kubecfg show and kubectl apply and runs it.
-pub fn apply(app_instance: &str, dry_run: &Option<DryRun>) -> Result<()> {
+pub fn apply(
+    app_instance: &str,
+    dry_run: &Option<DryRun>,
+    package_image: &Option<String>,
+) -> Result<()> {
     let (mut output, path): (Box<dyn Write>, _) = if matches!(dry_run, Some(DryRun::Script)) {
         (Box::new(stdout()), None)
     } else {
@@ -57,7 +66,11 @@ pub fn apply(app_instance: &str, dry_run: &Option<DryRun>) -> Result<()> {
 
     let overlay_file_name = app_instance;
     let file = File::open(overlay_file_name)?;
-    let app_instance: AppInstance = serde_yaml::from_reader(file)?;
+    let mut app_instance: AppInstance = serde_yaml::from_reader(file)?;
+
+    if let Some(package_image) = package_image {
+        app_instance.spec.package.image = package_image.clone();
+    }
 
     let steps = vec![
         Script::from_str("export KUBECTL_APPLYSET=true"),
