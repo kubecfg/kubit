@@ -37,12 +37,18 @@ pub fn emit_commandline(
 ) -> Vec<String> {
     let image = &app_instance.spec.package.image;
 
+    let entrypoint = if image.starts_with("file://") {
+        image.clone()
+    } else {
+        format!("oci://{image}")
+    };
+
     let mut cli = [
         "kubecfg",
         "show",
         "--alpha",
         "--reorder=server",
-        &format!("oci://{image}"),
+        &entrypoint,
         "--overlay-code-file",
         &format!("appInstance_={overlay_file}"),
     ]
