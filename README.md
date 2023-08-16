@@ -10,7 +10,7 @@ The `kubit` operator is a Kubernetes controller that can render and apply jsonne
 ### Kubernetes controller
 
 ```bash
-kubectl apply -k https://github.com/kubecfg/kubit//kustomize/global?ref=v0.0.6
+kubectl apply -k https://github.com/kubecfg/kubit//kustomize/global?ref=v0.0.7
 ```
 
 The Kubernetes controller is the main way to use kubit.
@@ -30,7 +30,7 @@ brew install kubecfg/kubit/kubit
 Direct install from sources:
 
 ```bash
-cargo install --git https://github.com/kubecfg/kubit/ --tag v0.0.6
+cargo install --git https://github.com/kubecfg/kubit/ --tag v0.0.7
 ```
 
 The CLI is an optional tool that provides helpers and alternative ways to install and inspect packages.
