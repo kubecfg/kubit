@@ -98,6 +98,6 @@ You can preview the actuall commands that `kubit` will run with:
 kubit apply foo.yaml --dry-run=script
 ```
 
-Other interesting optinos are `--dry-run=render` and `--dry-run=diff` which will respectively just render the YAML without applying it
+Other interesting options are `--dry-run=render` and `--dry-run=diff` which will respectively just render the YAML without applying it
 and rendering + diffing the manifests against a runnig application. This can be useful to preview effects of changes in the spec or
 between versions of a package
