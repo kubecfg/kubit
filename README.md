@@ -10,7 +10,7 @@ The `kubit` operator is a Kubernetes controller that can render and apply jsonne
 ### Kubernetes controller
 
 ```bash
-kubectl apply -k https://github.com/kubecfg/kubit//kustomize/global?ref=v0.0.7
+kubectl apply -k 'https://github.com/kubecfg/kubit//kustomize/global?ref=v0.0.7'
 ```
 
 The Kubernetes controller is the main way to use kubit.
