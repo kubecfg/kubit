@@ -17,11 +17,15 @@ The Kubernetes controller is the main way to use kubit.
 
 ### CLI tool
 
-Homebrew (popular on macos, but also available on linux)
+#### Homebrew
+
+(popular on macos, but also available on linux)
 
 ```bash
 brew install kubecfg/kubit/kubit
 ```
+
+#### cargo install
 
 Direct install from sources:
 
