@@ -44,6 +44,9 @@ spec:
                 - image
                 - spec
                 type: object
+              pause:
+                description: If true, the controller will not reconcile this application. You can use this if you need to do some manual changes (either with kubectl directly or with kubit CLI)
+                type: boolean
             required:
             - package
             type: object
