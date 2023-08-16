@@ -135,6 +135,15 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
     // slow down things a little bit
     tokio::time::sleep(Duration::from_secs(1)).await;
 
+    if app_instance.spec.pause {
+        info!(
+            name = app_instance.name_any(),
+            ns = app_instance.namespace(),
+            "paused"
+        );
+        return Ok(Action::await_change());
+    }
+
     let state = reconciliation_state(&app_instance, &ctx).await?;
     info!(?state);
 

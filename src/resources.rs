@@ -19,6 +19,12 @@ use serde::{Deserialize, Serialize};
 pub struct AppInstanceSpec {
     pub package: Package,
     pub image_pull_secrets: Option<Vec<LocalObjectReference>>,
+
+    /// If true, the controller will not reconcile this application.
+    /// You can use this if you need to do some manual changes (either with kubectl directly or with kubit CLI)
+    #[serde(default)]
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub pause: bool,
 }
 
 // Like k8s_openapi::api::core::v1::LocalObjectReference but derives JsonSchema
