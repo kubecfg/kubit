@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use kube::CustomResource;
 use schemars::{
     schema::{Schema, SchemaObject},
@@ -61,4 +62,19 @@ fn preserve_arbitrary(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
 #[serde(rename_all = "camelCase")]
 pub struct AppInstanceStatus {
     pub last_logs: Option<HashMap<String, String>>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    pub conditions: Vec<AppInstanceCondition>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AppInstanceCondition {
+    pub last_transition_time: Time,
+    pub message: String,
+    #[serde(default)]
+    pub observed_generation: Option<i64>,
+    pub reason: String,
+    pub status: String,
+    pub type_: String,
 }

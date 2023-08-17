@@ -9,7 +9,8 @@ use k8s_openapi::{
         },
         rbac::v1::{PolicyRule, Role, RoleBinding, RoleRef, Subject},
     },
-    apimachinery::pkg::apis::meta::v1::OwnerReference,
+    apimachinery::pkg::apis::meta::v1::{OwnerReference, Time},
+    chrono::Utc,
 };
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
@@ -35,7 +36,7 @@ use crate::{
     apply,
     docker_config::DockerConfig,
     render,
-    resources::{AppInstance, AppInstanceStatus},
+    resources::{AppInstance, AppInstanceCondition, AppInstanceStatus},
     Error, Result,
 };
 
@@ -151,9 +152,44 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
     let state = reconciliation_state(&app_instance, &ctx).await?;
     info!(?state);
 
+    // We have two status conditions
+    //
+    // Reconcilier: It will report the status of each iteration of the reconcilier.
+    //              When the reconcilier retries previous failed runs it will report a new fresh run and thus you may
+    //              not see the errors of the previous run.
+    // Ready: It will report the overall Readiness of the instance installation process. If it fails, the error message will stick
+    //        for longer even if there is another ongoing run of the reconcilier that is retrying.
+
     let action = match state {
         ReconciliationState::Idle => {
-            launch_job(&app_instance, &ctx).await?;
+            match launch_job(&app_instance, &ctx).await {
+                Ok(()) => {
+                    update_condition(
+                        &app_instance,
+                        &ctx,
+                        "Reconcilier",
+                        "False",
+                        "ExpandingTemplate",
+                        None,
+                    )
+                    .await?;
+                }
+                Err(err) => {
+                    update_condition(&app_instance, &ctx, "Reconcilier", "False", "Failed", None)
+                        .await?;
+
+                    update_condition(
+                        &app_instance,
+                        &ctx,
+                        "Ready",
+                        "False",
+                        "Failed",
+                        Some(format!("Cannot launch installation job: {err}")),
+                    )
+                    .await?;
+                    return Err(err);
+                }
+            };
             Action::await_change()
         }
         ReconciliationState::Executing => {
@@ -167,10 +203,39 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
             let action = match outcome {
                 JobOutcome::Success => {
                     info!("job completed successfully");
+                    update_condition(
+                        &app_instance,
+                        &ctx,
+                        "Reconcilier",
+                        "True",
+                        "Succeeded",
+                        None,
+                    )
+                    .await?;
+                    update_condition(
+                        &app_instance,
+                        &ctx,
+                        "Ready",
+                        "True",
+                        "JobCompletedSuccessfully",
+                        None,
+                    )
+                    .await?;
                     Action::await_change()
                 }
                 JobOutcome::Failure => {
                     info!("job failed");
+                    update_condition(&app_instance, &ctx, "Reconcilier", "True", "Failed", None)
+                        .await?;
+                    update_condition(
+                        &app_instance,
+                        &ctx,
+                        "Ready",
+                        "False",
+                        "JobFailed",
+                        Some("full logs in .status.lastLogs field".to_string()),
+                    )
+                    .await?;
                     Action::requeue(Duration::from_secs(60))
                 }
             };
@@ -371,7 +436,7 @@ async fn launch_job(app_instance: &AppInstance, ctx: &Context) -> Result<()> {
     setup_job_rbac(app_instance, ctx).await?;
 
     let package_config: PackageConfig = fetch_package_config(app_instance, ctx).await?;
-    info!(?package_config, "got package config");
+    info!("got package config");
 
     let kubecfg_image = package_config.versioned_kubecfg_image(ctx)?;
     info!("Using: {}", kubecfg_image);
@@ -606,14 +671,102 @@ async fn capture_logs(app_instance: &AppInstance, ctx: &Context, job_uid: String
         info!(logs_json);
     }
 
+    let api: Api<AppInstance> = Api::namespaced(ctx.client.clone(), ns);
+    let old_status = api
+        .get_status(&app_instance.name_any())
+        .await?
+        .status
+        .clone()
+        .unwrap_or_default();
+
+    update_status(
+        app_instance,
+        ctx,
+        AppInstanceStatus {
+            last_logs: Some(per_container_logs),
+            ..old_status
+        },
+    )
+    .await?;
+    Ok(())
+}
+
+async fn update_condition(
+    app_instance: &AppInstance,
+    ctx: &Context,
+    type_: &str,
+    status: &str,
+    reason: &str,
+    message: Option<String>,
+) -> Result<()> {
+    let ns = &app_instance.namespace().ok_or(Error::NamespaceRequired)?;
+    let api: Api<AppInstance> = Api::namespaced(ctx.client.clone(), ns);
+
+    let old_status = api
+        .get_status(&app_instance.name_any())
+        .await?
+        .status
+        .clone()
+        .unwrap_or_default();
+
+    let mut conditions = old_status.conditions;
+    update_condition_vec(&mut conditions, type_, status, reason, message)?;
+
+    let status = AppInstanceStatus {
+        conditions,
+        ..old_status
+    };
+
+    update_status(app_instance, ctx, status).await
+}
+
+fn update_condition_vec(
+    vec: &mut Vec<AppInstanceCondition>,
+    type_: &str,
+    status: &str,
+    reason: &str,
+    message: Option<String>,
+) -> Result<()> {
+    let new_condition = AppInstanceCondition {
+        message: message.unwrap_or_default(),
+        reason: reason.to_string(),
+        status: status.to_string(),
+        type_: type_.to_string(),
+        last_transition_time: Time(Utc::now()),
+        observed_generation: None,
+    };
+    for i in vec.iter_mut() {
+        if i.type_ == type_ {
+            *i = new_condition;
+            return Ok(());
+        }
+    }
+
+    vec.push(new_condition);
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn find_condition(app_instance: &AppInstance, type_: &str) -> Option<AppInstanceCondition> {
+    app_instance
+        .status
+        .as_ref()
+        .and_then(|s| s.conditions.iter().find(|i| i.type_ == type_).cloned())
+}
+
+async fn update_status(
+    app_instance: &AppInstance,
+    ctx: &Context,
+    status: AppInstanceStatus,
+) -> Result<()> {
+    let ns = &app_instance.namespace().ok_or(Error::NamespaceRequired)?;
+
     let app_instance_api: Api<AppInstance> = Api::namespaced(ctx.client.clone(), ns);
 
     let app_instance_patch = AppInstance {
         metadata: Default::default(),
         spec: Default::default(),
-        status: Some(AppInstanceStatus {
-            last_logs: Some(per_container_logs),
-        }),
+        status: Some(status),
     };
     app_instance_api
         .patch_status(
@@ -622,6 +775,72 @@ async fn capture_logs(app_instance: &AppInstance, ctx: &Context, job_uid: String
             &Patch::Apply(&app_instance_patch),
         )
         .await?;
-    info!("status patched");
+    info!(conditions=?app_instance_patch.status.map(|s|s.conditions), "status patched");
+
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    //    use assert_matches::assert_matches;
+
+    #[test]
+    fn manipulate_conditions() {
+        let mut conditions = vec![];
+
+        update_condition_vec(
+            &mut conditions,
+            "Ready",
+            "False",
+            "WakingUpWithoutCoffee",
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(
+            conditions.iter().map(|c| &c.type_).collect::<Vec<_>>(),
+            &["Ready"]
+        );
+        assert_eq!(
+            conditions.iter().map(|c| &c.status).collect::<Vec<_>>(),
+            &["False"]
+        );
+
+        update_condition_vec(
+            &mut conditions,
+            "Healthy",
+            "False",
+            "NotReady",
+            Some("still waking up".to_string()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            conditions.iter().map(|c| &c.type_).collect::<Vec<_>>(),
+            &["Ready", "Healthy"]
+        );
+        assert_eq!(
+            conditions.iter().map(|c| &c.status).collect::<Vec<_>>(),
+            &["False", "False"]
+        );
+
+        update_condition_vec(
+            &mut conditions,
+            "Ready",
+            "True",
+            "ReconciliationSucceeded",
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(
+            conditions.iter().map(|c| &c.type_).collect::<Vec<_>>(),
+            &["Ready", "Healthy"]
+        );
+        assert_eq!(
+            conditions.iter().map(|c| &c.status).collect::<Vec<_>>(),
+            &["True", "False"]
+        );
+    }
 }
