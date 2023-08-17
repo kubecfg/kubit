@@ -49,6 +49,7 @@ const APPLIER_SERVICE_ACCOUNT: &str = "kubit-applier";
 struct Context {
     client: Client,
     kubecfg_image: String,
+    only_paused: bool,
 }
 
 fn error_policy(app_instance: Arc<AppInstance>, error: &Error, _ctx: Arc<Context>) -> Action {
@@ -58,7 +59,7 @@ fn error_policy(app_instance: Arc<AppInstance>, error: &Error, _ctx: Arc<Context
     Action::requeue(Duration::from_secs(5))
 }
 
-pub async fn run(client: Client, kubecfg_image: String) -> Result<()> {
+pub async fn run(client: Client, kubecfg_image: String, only_paused: bool) -> Result<()> {
     let docs = Api::<AppInstance>::all(client.clone());
     if let Err(e) = docs.list(&ListParams::default().limit(1)).await {
         error!("CRD is not queryable; {e:?}. Is the CRD installed?");
@@ -76,6 +77,7 @@ pub async fn run(client: Client, kubecfg_image: String) -> Result<()> {
             Arc::new(Context {
                 client,
                 kubecfg_image,
+                only_paused,
             }),
         )
         .filter_map(|x| async move { std::result::Result::ok(x) })
@@ -135,10 +137,12 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
     // slow down things a little bit
     tokio::time::sleep(Duration::from_secs(1)).await;
 
-    if app_instance.spec.pause {
+    if app_instance.spec.pause != ctx.only_paused {
         info!(
             name = app_instance.name_any(),
             ns = app_instance.namespace(),
+            app_instance.spec.pause,
+            ctx.only_paused,
             "paused"
         );
         return Ok(Action::await_change());

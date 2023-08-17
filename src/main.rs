@@ -33,6 +33,10 @@ async fn main() -> anyhow::Result<()> {
         #[clap(long, default_value = "ghcr.io/kubecfg/kubecfg/kubecfg")]
         kubecfg_image: String,
 
+        /// If true, processes only paused instances
+        #[clap(long, default_value = "false")]
+        only_paused: bool,
+
         #[command(subcommand)]
         command: Option<Commands>,
     }
@@ -81,6 +85,7 @@ async fn main() -> anyhow::Result<()> {
         admin,
         kubecfg_image,
         command,
+        only_paused,
     } = Args::parse();
 
     // Expand vector as more CRDs are created.
@@ -126,7 +131,7 @@ async fn main() -> anyhow::Result<()> {
                 .build()
                 .await?;
 
-            let controller = controller::run(rt.client(), kubecfg_image);
+            let controller = controller::run(rt.client(), kubecfg_image, only_paused);
 
             // Both runtimes implements graceful shutdown, so poll until both are done
             tokio::join!(controller, rt.run()).1?;
