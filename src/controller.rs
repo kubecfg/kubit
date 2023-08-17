@@ -775,7 +775,7 @@ async fn update_status(
             &Patch::Apply(&app_instance_patch),
         )
         .await?;
-    info!(conditions=?app_instance_patch.status.map(|s|s.conditions), "status patched");
+    info!("status patched");
 
     Ok(())
 }
