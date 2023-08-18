@@ -9,7 +9,7 @@ use std::{
 use clap::{Parser, Subcommand};
 use kube::CustomResourceExt;
 
-use kubit::{apply, controller, local, render, resources::AppInstance};
+use kubit::{apply, controller, local, metadata, render, resources::AppInstance};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -68,6 +68,11 @@ async fn main() -> anyhow::Result<()> {
             #[command(subcommand)]
             local: local::Local,
         },
+
+        Metadata {
+            #[command(subcommand)]
+            metadata: metadata::Metadata,
+        },
     }
 
     #[derive(Clone, Subcommand)]
@@ -107,6 +112,7 @@ async fn main() -> anyhow::Result<()> {
                 serde_yaml::to_writer(out_writer, &crd).unwrap();
             }
         }
+        Some(Commands::Metadata { metadata }) => metadata::run(metadata).await?,
         Some(Commands::Local { local }) => local::run(local)?,
         Some(Commands::Scripts {
             app_instance,

@@ -5,11 +5,11 @@ pub enum Error {
     #[error("Kube Error: {0}")]
     KubeError(#[from] kube::Error),
 
-    #[error("OCI error: {0}")]
-    OCIParseError(#[from] oci_distribution::ParseError),
+    #[error("{0}")]
+    OCI(#[from] oci::Error),
 
     #[error("OCI error: {0}")]
-    OCIError(#[from] oci_distribution::errors::OciDistributionError),
+    OCIParseError(#[from] oci_distribution::ParseError),
 
     #[error("Unsupported manifest type: Index")]
     UnsupportedManifestIndex,
@@ -55,7 +55,9 @@ pub mod resources;
 
 pub mod apply;
 pub mod local;
+pub mod metadata;
 pub mod render;
 mod scripting;
 
 mod docker_config;
+mod oci;
