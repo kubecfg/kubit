@@ -1,6 +1,6 @@
 [package]
 name = "kubit"
-version = "0.0.8"
+version = "0.0.9"
 license = "MIT"
 edition = "2021"
 keywords = ["kubernetes"]
@@ -21,7 +21,7 @@ k8s-openapi = { version = "0.18.0", features = ["v1_26", "schemars"] }
 kubert = { git = "https://github.com/kubecfg/kubert", features = ["clap", "runtime", "server", "metrics"], rev="277222baaef82d53cbafdfb18cac559e346e1ce4" }
 # kubert = { version = "0.16.1", features = ["clap", "runtime", "server"] }
 tokio = { version = "1.32", features = ["full"] }
-anyhow = { version = "1", features = ["backtrace"] } 
+anyhow = { version = "1", features = ["backtrace"] }
 tracing = "0.1"
 schemars = "0.8.12"
 serde = { version = "1", features = ["derive"] }
