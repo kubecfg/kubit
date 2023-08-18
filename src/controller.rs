@@ -200,6 +200,8 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
             Action::await_change()
         }
         ReconciliationState::JobTerminated(job_uid, outcome) => {
+            let log_summary = capture_logs(&app_instance, &ctx, job_uid).await?;
+
             let action = match outcome {
                 JobOutcome::Success => {
                     info!("job completed successfully");
@@ -233,13 +235,12 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
                         "Ready",
                         "False",
                         "JobFailed",
-                        Some("full logs in .status.lastLogs field".to_string()),
+                        Some(log_summary),
                     )
                     .await?;
                     Action::requeue(Duration::from_secs(60))
                 }
             };
-            capture_logs(&app_instance, &ctx, job_uid).await?;
             delete_job(&app_instance, &ctx).await?;
             action
         }
@@ -602,7 +603,11 @@ fn is_job_failed() -> impl Condition<Job> {
     }
 }
 
-async fn capture_logs(app_instance: &AppInstance, ctx: &Context, job_uid: String) -> Result<()> {
+async fn capture_logs(
+    app_instance: &AppInstance,
+    ctx: &Context,
+    job_uid: String,
+) -> Result<String> {
     let ns = &app_instance.namespace().ok_or(Error::NamespaceRequired)?;
     info!(?ns, "reporting errors");
 
@@ -617,6 +622,7 @@ async fn capture_logs(app_instance: &AppInstance, ctx: &Context, job_uid: String
         .await?;
 
     let mut per_container_logs = HashMap::new();
+    let mut log_summary = String::new();
 
     // There should be exactly one pod per job. In the unlikely even
     // something is broken with k8s and we end up getting two pods matching the same job uid
@@ -627,6 +633,7 @@ async fn capture_logs(app_instance: &AppInstance, ctx: &Context, job_uid: String
     // something more complicated like capturing the pod names and grouping the logs by pod name.
     for pod in pods.items {
         let mut container_names = vec![];
+        let mut failed_container_name = None;
 
         let pod_status = pod.status.as_ref().unwrap();
         let container_statuses = [
@@ -651,6 +658,16 @@ async fn capture_logs(app_instance: &AppInstance, ctx: &Context, job_uid: String
             if !is_waiting {
                 container_names.push(&status.name);
             }
+
+            let has_failed = status
+                .state
+                .as_ref()
+                .and_then(|x| x.terminated.as_ref())
+                .map(|x| x.exit_code > 0)
+                .unwrap_or(false);
+            if has_failed {
+                failed_container_name = Some(status.name.clone());
+            }
         }
 
         for container_name in container_names {
@@ -663,6 +680,17 @@ async fn capture_logs(app_instance: &AppInstance, ctx: &Context, job_uid: String
                     },
                 )
                 .await?;
+
+            if Some(container_name) == failed_container_name.as_ref() {
+                if let Some(last_line) = logs.lines().next() {
+                    log_summary.push_str(last_line);
+                }
+                log_summary.push_str("\n...\n");
+                if let Some(last_line) = logs.lines().last() {
+                    log_summary.push_str(last_line);
+                }
+            }
+
             per_container_logs
                 .entry(container_name.clone())
                 .and_modify(|e: &mut String| e.push_str(&logs))
@@ -690,7 +718,7 @@ async fn capture_logs(app_instance: &AppInstance, ctx: &Context, job_uid: String
         },
     )
     .await?;
-    Ok(())
+    Ok(log_summary)
 }
 
 async fn update_condition(
