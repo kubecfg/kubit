@@ -402,10 +402,12 @@ async fn setup_job_rbac(app_instance: &AppInstance, ctx: &Context) -> Result<()>
         rules: Some(vec![PolicyRule {
             api_groups: Some(["*"].iter().map(|s| s.to_string()).collect()),
             resources: Some(["*"].iter().map(|s| s.to_string()).collect()),
-            verbs: ["create", "update", "get", "list", "patch", "watch"]
-                .iter()
-                .map(|s| s.to_string())
-                .collect(),
+            verbs: [
+                "create", "update", "get", "list", "patch", "watch", "delete",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
             ..Default::default()
         }]),
     };
