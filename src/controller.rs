@@ -24,10 +24,7 @@ use kube::{
     },
     Api, Client, Resource, ResourceExt,
 };
-use oci_distribution::{
-    manifest::OciManifest, secrets::RegistryAuth, Client as OCIClient, Reference,
-};
-use serde::{Deserialize, Serialize};
+use oci_distribution::{secrets::RegistryAuth, Reference};
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, warn};
@@ -35,12 +32,11 @@ use tracing::{debug, error, info, warn};
 use crate::{
     apply,
     docker_config::DockerConfig,
+    oci::{self, PackageConfig},
     render,
     resources::{AppInstance, AppInstanceCondition, AppInstanceStatus},
     Error, Result,
 };
-
-const PACK_KEY: &str = "pack.kubecfg.dev/v1alpha1";
 
 const KUBECTL_IMAGE: &str =
     "bitnami/kubectl@sha256:d5229eb7ad4fa8e8cb9004e63b6b257fe5c925de4bde9c6fcbee5e758c08cc13";
@@ -86,32 +82,6 @@ pub async fn run(client: Client, kubecfg_image: String, only_paused: bool) -> Re
         .await;
 
     Ok(())
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct PackageConfig {
-    entrypoint: String,
-    #[serde(default)]
-    metadata: HashMap<String, serde_json::Value>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct KubecfgPackageMetadata {
-    version: String,
-}
-
-impl PackageConfig {
-    fn kubecfg_package_metadata(&self) -> Result<KubecfgPackageMetadata> {
-        serde_json::from_value(self.metadata.get(PACK_KEY).unwrap().clone())
-            .map_err(Error::DecodeKubecfgPackageMetadata)
-    }
-
-    fn versioned_kubecfg_image(&self, ctx: &Context) -> Result<String> {
-        let kubecfg_version = &self.kubecfg_package_metadata()?.version;
-        Ok(format!("{}:{kubecfg_version}", ctx.kubecfg_image))
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -320,33 +290,9 @@ async fn get_image_pull_secrets(app_instance: &AppInstance, ctx: &Context) -> Re
 }
 
 async fn fetch_package_config(app_instance: &AppInstance, ctx: &Context) -> Result<PackageConfig> {
-    let image = &app_instance.spec.package.image;
-    info!(image, "fetching image");
-
-    let reference: Reference = image.parse()?;
-    info!(?reference, "reference");
     let auth = get_image_pull_secrets(app_instance, ctx).await?;
-
-    let client_config = oci_distribution::client::ClientConfig {
-        protocol: oci_distribution::client::ClientProtocol::Https,
-        ..Default::default()
-    };
-    let mut client = OCIClient::new(client_config);
-    let (manifest, _) = client.pull_manifest(&reference, &auth).await?;
-
-    let manifest = match manifest {
-        OciManifest::Image(manifest) => manifest,
-        OciManifest::ImageIndex(_) => return Err(Error::UnsupportedManifestIndex),
-    };
-
-    let mut buf = vec![];
-    client
-        .pull_blob(&reference, &manifest.config.digest, &mut buf)
-        .await?;
-
-    let config = serde_json::from_slice(&buf).map_err(Error::DecodePackageConfig)?;
-
-    Ok(config)
+    let res = oci::fetch_package_config(app_instance, &auth).await?;
+    Ok(res)
 }
 
 fn handle_resource_exists<R>(res: kube::Result<R>) -> Result<()>
@@ -441,7 +387,7 @@ async fn launch_job(app_instance: &AppInstance, ctx: &Context) -> Result<()> {
     let package_config: PackageConfig = fetch_package_config(app_instance, ctx).await?;
     info!("got package config");
 
-    let kubecfg_image = package_config.versioned_kubecfg_image(ctx)?;
+    let kubecfg_image = package_config.versioned_kubecfg_image(&ctx.kubecfg_image)?;
     info!("Using: {}", kubecfg_image);
 
     create_job(app_instance, kubecfg_image, ctx).await
@@ -813,7 +759,6 @@ async fn update_status(
 #[cfg(test)]
 mod tests {
     use super::*;
-    //    use assert_matches::assert_matches;
 
     #[test]
     fn manipulate_conditions() {
