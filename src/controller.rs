@@ -757,7 +757,7 @@ fn update_condition_vec(
     reason: &str,
     message: Option<String>,
 ) -> Result<()> {
-    let new_condition = AppInstanceCondition {
+    let mut new_condition = AppInstanceCondition {
         message: message.unwrap_or_default(),
         reason: reason.to_string(),
         status: status.to_string(),
@@ -767,6 +767,9 @@ fn update_condition_vec(
     };
     for i in vec.iter_mut() {
         if i.type_ == type_ {
+            if i.status == new_condition.status {
+                new_condition.last_transition_time = i.last_transition_time.clone();
+            }
             *i = new_condition;
             return Ok(());
         }
@@ -872,5 +875,34 @@ mod tests {
             conditions.iter().map(|c| &c.status).collect::<Vec<_>>(),
             &["True", "False"]
         );
+
+        let prev_transition = conditions[0].last_transition_time.clone();
+        let prev_message = conditions[0].message.clone();
+        update_condition_vec(
+            &mut conditions,
+            "Ready",
+            "True",
+            "ReconciliationSucceeded",
+            Some("message change doesn't cause transition time change".to_string()),
+        )
+        .unwrap();
+        let next_transition = conditions[0].last_transition_time.clone();
+        let next_message = conditions[0].message.clone();
+
+        assert_eq!(prev_transition, next_transition);
+        assert_ne!(prev_message, next_message);
+
+        update_condition_vec(
+            &mut conditions,
+            "Ready",
+            "False",
+            "EverythingIsBroken",
+            None,
+        )
+        .unwrap();
+
+        let next_transition = conditions[0].last_transition_time.clone();
+
+        assert!(prev_transition < next_transition);
     }
 }
