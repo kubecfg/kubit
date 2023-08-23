@@ -2,7 +2,7 @@ name: Rust
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "smith/attempt-to-fix-rbac"]
     tags:
       - v*.*.*
   pull_request:
@@ -70,7 +70,6 @@ jobs:
         if: github.event_name != 'pull_request'
 
   release:
-
     # Allow depot permissions to GHCR
     permissions:
       contents: read
