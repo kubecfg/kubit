@@ -345,26 +345,54 @@ async fn setup_job_rbac(app_instance: &AppInstance, ctx: &Context) -> Result<()>
         .patch(&res.name_any(), &pp, &Patch::Apply(&res))
         .await?;
 
-    let role: Api<Role> = Api::namespaced(ctx.client.clone(), &ns);
+    let role: Api<ClusterRole> = Api::all(ctx.client.clone());
     let res = ClusterRole {
         metadata: metadata.clone(),
-        rules: Some(vec![PolicyRule {
-            api_groups: Some(["*"].iter().map(|s| s.to_string()).collect()),
-            resources: Some(["*"].iter().map(|s| s.to_string()).collect()),
-            verbs: [
-                "create", "update", "get", "list", "patch", "watch", "delete",
-            ]
-            .iter()
-            .map(|s| s.to_string())
-            .collect(),
-            ..Default::default()
-        }]),
+        rules: Some(vec![
+            PolicyRule {
+                api_groups: Some(["*"].iter().map(|s| s.to_string()).collect()),
+                resources: Some(["*"].iter().map(|s| s.to_string()).collect()),
+                verbs: [
+                    "create", "update", "get", "list", "patch", "watch", "delete",
+                ]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+                ..Default::default()
+            },
+            PolicyRule {
+                api_groups: Some(
+                    ["monitoring.coreos.com"]
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
+                ),
+                resources: Some(["*"].iter().map(|s| s.to_string()).collect()),
+                verbs: [
+                    "create", "update", "get", "list", "patch", "watch", "delete",
+                ]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+                ..Default::default()
+            },
+            PolicyRule {
+                non_resource_urls: Some(["/metrics"].iter().map(|s| s.to_string()).collect()),
+                verbs: [
+                    "create", "update", "get", "list", "patch", "watch", "delete",
+                ]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+                ..Default::default()
+            },
+        ]),
         aggregation_rule: None,
     };
     role.patch(&res.name_any(), &pp, &Patch::Apply(&res))
         .await?;
 
-    let api: Api<RoleBinding> = Api::namespaced(ctx.client.clone(), &ns);
+    let api: Api<ClusterRoleBinding> = Api::all(ctx.client.clone());
     let role_binding = ClusterRoleBinding {
         metadata: metadata.clone(),
         role_ref: RoleRef {
@@ -375,6 +403,7 @@ async fn setup_job_rbac(app_instance: &AppInstance, ctx: &Context) -> Result<()>
         subjects: Some(vec![Subject {
             kind: "ServiceAccount".to_string(),
             name: APPLIER_SERVICE_ACCOUNT.to_string(),
+            namespace: Some("influxdb".to_string()),
             ..Default::default()
         }]),
     };
