@@ -7,7 +7,9 @@ use k8s_openapi::{
             Container, EnvVar, KeyToPath, Pod, PodSpec, PodTemplateSpec, Secret,
             SecretVolumeSource, ServiceAccount, Volume, VolumeMount,
         },
-        rbac::v1::{PolicyRule, Role, RoleBinding, RoleRef, Subject},
+        rbac::v1::{
+            ClusterRole, ClusterRoleBinding, PolicyRule, Role, RoleBinding, RoleRef, Subject,
+        },
     },
     apimachinery::pkg::apis::meta::v1::{OwnerReference, Time},
     chrono::Utc,
@@ -344,7 +346,7 @@ async fn setup_job_rbac(app_instance: &AppInstance, ctx: &Context) -> Result<()>
         .await?;
 
     let role: Api<Role> = Api::namespaced(ctx.client.clone(), &ns);
-    let res = Role {
+    let res = ClusterRole {
         metadata: metadata.clone(),
         rules: Some(vec![PolicyRule {
             api_groups: Some(["*"].iter().map(|s| s.to_string()).collect()),
@@ -357,16 +359,17 @@ async fn setup_job_rbac(app_instance: &AppInstance, ctx: &Context) -> Result<()>
             .collect(),
             ..Default::default()
         }]),
+        aggregation_rule: None,
     };
     role.patch(&res.name_any(), &pp, &Patch::Apply(&res))
         .await?;
 
     let api: Api<RoleBinding> = Api::namespaced(ctx.client.clone(), &ns);
-    let role_binding = RoleBinding {
+    let role_binding = ClusterRoleBinding {
         metadata: metadata.clone(),
         role_ref: RoleRef {
             api_group: "rbac.authorization.k8s.io".to_string(),
-            kind: "Role".to_string(),
+            kind: "ClusterRole".to_string(),
             name: APPLIER_SERVICE_ACCOUNT.to_string(),
         },
         subjects: Some(vec![Subject {
