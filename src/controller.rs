@@ -7,9 +7,7 @@ use k8s_openapi::{
             Container, EnvVar, KeyToPath, Pod, PodSpec, PodTemplateSpec, Secret,
             SecretVolumeSource, ServiceAccount, Volume, VolumeMount,
         },
-        rbac::v1::{
-            ClusterRole, ClusterRoleBinding, PolicyRule, RoleRef, Subject,
-        },
+        rbac::v1::{ClusterRole, ClusterRoleBinding, PolicyRule, RoleRef, Subject},
     },
     apimachinery::pkg::apis::meta::v1::{OwnerReference, Time},
     chrono::Utc,
