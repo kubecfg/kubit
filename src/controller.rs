@@ -8,7 +8,7 @@ use k8s_openapi::{
             SecretVolumeSource, ServiceAccount, Volume, VolumeMount,
         },
         rbac::v1::{
-            ClusterRole, ClusterRoleBinding, PolicyRule, Role, RoleBinding, RoleRef, Subject,
+            ClusterRole, ClusterRoleBinding, PolicyRule, RoleRef, Subject,
         },
     },
     apimachinery::pkg::apis::meta::v1::{OwnerReference, Time},
@@ -403,7 +403,7 @@ async fn setup_job_rbac(app_instance: &AppInstance, ctx: &Context) -> Result<()>
         subjects: Some(vec![Subject {
             kind: "ServiceAccount".to_string(),
             name: APPLIER_SERVICE_ACCOUNT.to_string(),
-            namespace: Some("influxdb".to_string()),
+            namespace: Some(ns),
             ..Default::default()
         }]),
     };
@@ -517,7 +517,7 @@ async fn create_job(
                 spec: Some(PodSpec {
                     service_account: Some(APPLIER_SERVICE_ACCOUNT.to_string()),
                     restart_policy: Some("Never".to_string()),
-                    active_deadline_seconds: Some(60),
+                    active_deadline_seconds: Some(180),
                     volumes: Some(volumes),
                     init_containers: Some(vec![
                         Container {
