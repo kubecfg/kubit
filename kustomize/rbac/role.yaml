@@ -4,73 +4,8 @@ kind: ClusterRole
 metadata:
   name: kubit
 rules:
-  # the kubit operator is controlled by appinstance resources and needs to be able to update
-  # the status and update the spec.
-  - apiGroups:
-      - kubecfg.dev
-    resources:
-      - appinstances
-      - appinstances/status
-      - appinstances/spec
-      - appinstances/finalizers
-    verbs:
-      - get
-      - patch
-      - list
-      - update
-      - watch
-  # kubit operator needs to spawn an instance-specific applier that runs in the target namespace
-  - apiGroups:
-      - batch
-    resources:
-      - jobs
-    verbs:
-      - create
-      - get
-      - list
-      - delete
-      - watch
-  # The kubit operator needs to access the image pull secret references by the AppInstance CR so it
-  # can access the package metadata and validate the spec json schema.
-  - apiGroups:
-      - ""
-    resources:
-      - secrets
-    verbs:
-      - get
-  # The instance specific applier job needs to have permissions
-  # to create resources in the target namespace. The kubit operator will create
-  # instance-specific RBAC rules for the applier job to use.
-  - apiGroups:
-      - ""
-    resources:
-      - serviceaccounts
-    verbs:
-      - create
-      - patch
-      - update
-      - list
-      - get
-      - delete
-  - apiGroups:
-      - rbac.authorization.k8s.io
-    resources:
-      - roles
-      - rolebindings
-    verbs:
-      - patch
-      - get
-      - delete
-  # the kubit operator needs to be able to read logs from the instance-specific applier
-  - apiGroups:
-      - ""
-    resources:
-      - pods
-      - pods/log
-    verbs:
-      - list
-      - get
-  # we need to have the same permissions the jobs has otherwise we cannot create the RBAC
+  # The kubit operator will create a specific namespace-scoped role used by the applier to apply arbitrary
+  # package into the namespace. In order to create that role in any namespace we need admin
   - apiGroups: ["*"]
     resources: ["*"]
     verbs: ["create", "update", "get", "list", "patch", "watch", "delete"]
