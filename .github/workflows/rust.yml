@@ -57,8 +57,9 @@ jobs:
           project: v8n5whjnsb
           context: .
           platforms: linux/amd64,linux/arm64
-          push: false
-          tags: ghcr.io/kubecfg/kubit:latest
+          push: true
+          tags: ghcr.io/kubecfg/kubit:latest-pr
+        if: github.event_name == 'pull_request'
       - name: Push
         uses: depot/build-push-action@39acb3f766a908058e746f5c7a166f73e4cdcb17 # v1
         with:
@@ -70,7 +71,6 @@ jobs:
         if: github.event_name != 'pull_request'
 
   release:
-
     # Allow depot permissions to GHCR
     permissions:
       contents: read
