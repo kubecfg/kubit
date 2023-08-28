@@ -13,13 +13,9 @@ description = "Install kubecfg packages"
 [dependencies]
 clap = { version = "4.4", features = ["derive", "help", "env", "std"] }
 futures = "0.3"
-kube = { version = "0.83.0", features = ["runtime", "client", "derive"] }
-k8s-openapi = { version = "0.18.0", features = ["v1_26", "schemars"] }
-# We cannot bump kube-res past 0.82.0 until this PR is merged: https://github.com/olix0r/kubert/pull/163
-# until then we can use this fork (I reviewed it and pinned the commit).
-# I cherry-picked the commit on top of v0.16.1
-kubert = { git = "https://github.com/kubecfg/kubert", features = ["clap", "runtime", "server", "metrics"], rev="277222baaef82d53cbafdfb18cac559e346e1ce4" }
-# kubert = { version = "0.16.1", features = ["clap", "runtime", "server"] }
+kube = { version = "0.85.0", features = ["runtime", "client", "derive"] }
+k8s-openapi = { version = "0.19.0", features = ["v1_26", "schemars"] }
+kubert = { version = "0.18.0", features = ["clap", "runtime", "server", "metrics", "rustls-tls"] }
 tokio = { version = "1.32", features = ["full"] }
 anyhow = { version = "1", features = ["backtrace"] }
 tracing = "0.1"
