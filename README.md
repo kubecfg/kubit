@@ -121,3 +121,41 @@ Sometimes you'd like to try out some jsonnet code before you package it up and p
 ```bash
 kubit local apply foo.yaml --dry-run=diff --package-image file://$HOME/my-project/my-main.jsonnet
 ```
+
+## Development
+
+### Without in-cluster controller
+
+Create Kubernetes resources:
+
+```bash
+kubectl apply -k ./kustomize/local
+```
+
+The manifests in `./kustomize/local` are like `./kustomize/global` but don't spawn the kubit controller.
+
+Build and run the controller locally:
+
+```bash
+cargo run -- --as system:serviceaccount:kubit:kubit
+```
+
+### Co-exist with in-cluster controller
+
+If you already installed kubit (e.g. with `kubectl apply -k ./kustomize/global`) in your test cluster but you still want to quickly run the locally built kubit controller without uninstalling the in-cluster controller you can _pause_ an appinstance and run the local controller with `--only-paused`:
+
+```bash
+kubectl patch -f foo.yaml --patch '{"spec":{"pause": true}}' --type merge 
+```
+
+Then you can run the controller locally and have it process **only** the resource you paused:
+
+```bash
+cargo run -- --as system:serviceaccount:kubit:kubit --only-paused
+```
+
+To unpause the resource:
+
+```bash
+kubectl patch -f foo.yaml --patch '{"spec":{"pause": false}}' --type merge 
+```
