@@ -38,7 +38,9 @@ async fn fetch_package_config(app_instance: &str) -> Result<PackageConfig> {
     let app_instance: AppInstance = serde_yaml::from_reader(file)?;
     let reference: Reference = app_instance.spec.package.image.parse()?;
     let credentials = docker_credential::get_credential(reference.registry())?;
-    let DockerCredential::UsernamePassword(username, password ) = credentials else {bail!("unsupported docker credentials")};
+    let DockerCredential::UsernamePassword(username, password) = credentials else {
+        bail!("unsupported docker credentials")
+    };
     let auth = RegistryAuth::Basic(username, password);
 
     let config = oci::fetch_package_config(&app_instance, &auth).await?;
