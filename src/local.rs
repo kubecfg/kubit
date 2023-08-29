@@ -27,11 +27,6 @@ pub enum Local {
         /// Override the package image field in the spec
         #[clap(long)]
         package_image: Option<String>,
-
-        /// Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
-        /// e.g. system:serviceaccount:myns:mysa
-        #[clap(long("as"))]
-        as_user: Option<String>,
     },
 }
 
@@ -42,15 +37,14 @@ pub enum DryRun {
     Script,
 }
 
-pub fn run(local: &Local) -> Result<()> {
+pub fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()> {
     match local {
         Local::Apply {
             app_instance,
             dry_run,
             package_image,
-            as_user,
         } => {
-            apply(app_instance, dry_run, package_image, as_user)?;
+            apply(app_instance, dry_run, package_image, impersonate_user)?;
         }
     };
     Ok(())
@@ -61,7 +55,7 @@ pub fn apply(
     app_instance: &str,
     dry_run: &Option<DryRun>,
     package_image: &Option<String>,
-    as_user: &Option<String>,
+    impersonate_user: &Option<String>,
 ) -> Result<()> {
     let (mut output, path): (Box<dyn Write>, _) = if matches!(dry_run, Some(DryRun::Script)) {
         (Box::new(stdout()), None)
@@ -85,7 +79,7 @@ pub fn apply(
             | match dry_run {
                 Some(DryRun::Render) => Script::from_str("cat"),
                 Some(DryRun::Diff) => diff(&app_instance)?,
-                Some(DryRun::Script) | None => apply::script(&app_instance, "-", as_user)?,
+                Some(DryRun::Script) | None => apply::script(&app_instance, "-", impersonate_user)?,
             },
     ];
     let script: Script = steps.into_iter().sum();
