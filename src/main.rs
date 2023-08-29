@@ -9,7 +9,7 @@ use std::{
 use clap::{Parser, Subcommand};
 use kube::CustomResourceExt;
 
-use kubit::{apply, controller, local, metadata, render, resources::AppInstance};
+use kubit::{apply, controller, helpers, local, metadata, render, resources::AppInstance};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -69,9 +69,15 @@ async fn main() -> anyhow::Result<()> {
             local: local::Local,
         },
 
+        /// Retreive metadata from an AppInstance's package
         Metadata {
             #[command(subcommand)]
             metadata: metadata::Metadata,
+        },
+
+        Helper {
+            #[command(subcommand)]
+            helper: helpers::Helper,
         },
     }
 
@@ -114,6 +120,7 @@ async fn main() -> anyhow::Result<()> {
         }
         Some(Commands::Metadata { metadata }) => metadata::run(metadata).await?,
         Some(Commands::Local { local }) => local::run(local, &client.impersonate_user)?,
+        Some(Commands::Helper { helper }) => helpers::run(helper).await?,
         Some(Commands::Scripts {
             app_instance,
             script,
