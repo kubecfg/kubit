@@ -515,7 +515,7 @@ async fn create_job(
                     containers: vec![Container {
                         name: "apply-manifests".to_string(),
                         image: Some(KUBECTL_IMAGE.to_string()),
-                        command: Some(apply::emit_commandline(app_instance, "/manifests")),
+                        command: Some(apply::emit_commandline(app_instance, "/manifests", &None)),
                         ..container_defaults.clone()
                     }],
                     ..Default::default()
