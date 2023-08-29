@@ -256,7 +256,7 @@ async fn get_image_pull_secrets(app_instance: &AppInstance, ctx: &Context) -> Re
 
     let secret_name = {
         let Some(ref refs) = app_instance.spec.image_pull_secrets else {
-            return Ok(RegistryAuth::Anonymous)
+            return Ok(RegistryAuth::Anonymous);
         };
         if refs.is_empty() {
             return Ok(RegistryAuth::Anonymous);
