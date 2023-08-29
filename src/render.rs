@@ -1,5 +1,3 @@
-use yash_quote::quoted;
-
 use crate::{resources::AppInstance, scripting::Script, Error, Result};
 
 /// Generates shell script that will render the manifest and writes it to writer.
@@ -72,9 +70,18 @@ pub fn emit_commandline(
     cli
 }
 
-pub fn emit_fetch_app_instance_script(ns: &str, name: &str, output_file: &str) -> String {
-    let ns = quoted(ns);
-    let name = quoted(name);
-    let output_file = quoted(output_file);
-    format!("kubectl get appinstances.kubecfg.dev --namespace {ns} {name} -o json >{output_file}")
+pub fn emit_fetch_app_instance_commandline(ns: &str, name: &str, output_file: &str) -> Vec<String> {
+    [
+        "kubit",
+        "helper",
+        "fetch-app-instance",
+        "--namespace",
+        ns,
+        "--output",
+        output_file,
+        name,
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect::<Vec<_>>()
 }

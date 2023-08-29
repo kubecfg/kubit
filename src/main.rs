@@ -30,8 +30,19 @@ async fn main() -> anyhow::Result<()> {
         #[clap(flatten)]
         admin: kubert::AdminArgs,
 
-        #[clap(long, default_value = "ghcr.io/kubecfg/kubecfg/kubecfg")]
+        #[clap(
+            long,
+            env = "KUBIT_KUBECFG_IMAGE",
+            default_value = "ghcr.io/kubecfg/kubecfg/kubecfg"
+        )]
         kubecfg_image: String,
+
+        #[clap(
+            long,
+            env = "KUBIT_KUBIT_IMAGE",
+           default_value = concat!("ghcr.io/kubecfg/kubit:v", env!("CARGO_PKG_VERSION"))
+        )]
+        kubit_image: String,
 
         /// If true, processes only paused instances
         #[clap(long, default_value = "false")]
@@ -95,6 +106,7 @@ async fn main() -> anyhow::Result<()> {
         client,
         admin,
         kubecfg_image,
+        kubit_image,
         command,
         only_paused,
     } = Args::parse();
@@ -146,7 +158,7 @@ async fn main() -> anyhow::Result<()> {
                 .build()
                 .await?;
 
-            let controller = controller::run(rt.client(), kubecfg_image, only_paused);
+            let controller = controller::run(rt.client(), kubecfg_image, kubit_image, only_paused);
 
             // Both runtimes implements graceful shutdown, so poll until both are done
             tokio::join!(controller, rt.run()).1?;
