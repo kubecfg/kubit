@@ -113,7 +113,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Some(Commands::Metadata { metadata }) => metadata::run(metadata).await?,
-        Some(Commands::Local { local }) => local::run(local)?,
+        Some(Commands::Local { local }) => local::run(local, &client.impersonate_user)?,
         Some(Commands::Scripts {
             app_instance,
             script,

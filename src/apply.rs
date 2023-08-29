@@ -17,16 +17,16 @@ where
 pub fn script(
     app_instance: &AppInstance,
     manifests_dir: &str,
-    as_user: &Option<String>,
+    impersonate_user: &Option<String>,
 ) -> Result<Script> {
-    let tokens = emit_commandline(app_instance, manifests_dir, as_user);
+    let tokens = emit_commandline(app_instance, manifests_dir, impersonate_user);
     Ok(Script::from_vec(tokens))
 }
 
 pub fn emit_commandline(
     app_instance: &AppInstance,
     manifests_dir: &str,
-    as_user: &Option<String>,
+    impersonate_user: &Option<String>,
 ) -> Vec<String> {
     let mut cli = vec![
         "kubectl",
@@ -48,7 +48,7 @@ pub fn emit_commandline(
     .map(|s| s.to_string())
     .collect::<Vec<_>>();
 
-    if let Some(as_user) = as_user {
+    if let Some(as_user) = impersonate_user {
         cli.push(format!("--as={as_user}"));
     }
 
