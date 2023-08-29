@@ -4,6 +4,16 @@
 
 The `kubit` operator is a Kubernetes controller that can render and apply jsonnet templates based on the [kubecfg](https://github.com/kubecfg/kubecfg) jsonnet tooling/framework.
 
+## Motivation
+
+`kubit` aims to decouple of the persona of who builds a package vs who installs it.
+
+In the current landscape, the choice of the templating engine is heavily influenced by what is the current tool your users are more comfortable with.
+For example, if you think your users are going to prefer using `helm` to install the package, you're likely to pick `helm` as your templating language.
+But it doesn't have to be this way. What if the tool used to _install_ the package is decoupled from the the choice of the tool used to build the package?
+
+By using `kubit` as the package installation method, the choice of `helm`, `kustomize`, or anything else becomes obselete as it installs packages from generic OCI bundles, a simple tarball containing manifests detailing how to install the package.
+This means that the installation experience is decoupled from the language of choice for packaging the application, it is simply handed to `kubit` and abstracted away, performing the necessary installation steps.
 
 ## Installation
 
@@ -145,7 +155,7 @@ cargo run -- --as system:serviceaccount:kubit:kubit
 If you already installed kubit (e.g. with `kubectl apply -k ./kustomize/global`) in your test cluster but you still want to quickly run the locally built kubit controller without uninstalling the in-cluster controller you can _pause_ an appinstance and run the local controller with `--only-paused`:
 
 ```bash
-kubectl patch -f foo.yaml --patch '{"spec":{"pause": true}}' --type merge 
+kubectl patch -f foo.yaml --patch '{"spec":{"pause": true}}' --type merge
 ```
 
 Then you can run the controller locally and have it process **only** the resource you paused:
@@ -157,5 +167,5 @@ cargo run -- --as system:serviceaccount:kubit:kubit --only-paused
 To unpause the resource:
 
 ```bash
-kubectl patch -f foo.yaml --patch '{"spec":{"pause": false}}' --type merge 
+kubectl patch -f foo.yaml --patch '{"spec":{"pause": false}}' --type merge
 ```
