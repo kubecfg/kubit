@@ -11,7 +11,11 @@ use crate::{
 
 #[derive(Clone, Subcommand)]
 pub enum Metadata {
+    /// Retrieve the JSON schema for the package `spec`.
     Schema { app_instance: String },
+
+    /// Retrieve the list of OCI images referenced by the package.
+    /// It can be useful when using private mirror for air-gapped environments.
     Images { app_instance: String },
 }
 

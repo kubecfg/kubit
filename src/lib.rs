@@ -54,6 +54,7 @@ pub mod controller;
 pub mod resources;
 
 pub mod apply;
+pub mod helpers;
 pub mod local;
 pub mod metadata;
 pub mod render;
