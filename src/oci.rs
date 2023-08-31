@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use crate::resources::AppInstance;
 
 const PACK_KEY: &str = "pack.kubecfg.dev/v1alpha1";
+const KUBIT_KEY: &str = "kubit.kubecfg.dev/v1alpha1";
+const IMAGE_LIST_KEY: &str = "oci.image.list";
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -23,6 +25,27 @@ pub enum Error {
 
     #[error("OCI error: {0}")]
     Oci(#[from] oci_distribution::errors::OciDistributionError),
+
+    #[error("Missing metadata key: pack.kubecfg.dev/v1alpha1")]
+    MissingMetadataKeyPack,
+
+    #[error("Missing metadata key: kubit.kubecfg.dev/v1alpha1")]
+    MissingMetadataKeyKubit,
+
+    #[error("Missing metadata key: schema under kubit.kubecfg.dev/v1alpha1")]
+    MissingMetadataKeyKubitSchema,
+
+    #[error("Missing metadata key: oci.image.list")]
+    MissingMetadataKeyImageList,
+
+    #[error("Missing metadata key: images under oci.image.list")]
+    MissingMetadataKeyImageListImages,
+
+    #[error("Error serializing JSON schema: {0}")]
+    SerializeJSONSchema(serde_json::Error),
+
+    #[error("Error serializing image list: {0}")]
+    SerializeImageList(serde_json::Error),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -43,8 +66,13 @@ pub struct KubecfgPackageMetadata {
 
 impl PackageConfig {
     pub fn kubecfg_package_metadata(&self) -> Result<KubecfgPackageMetadata> {
-        serde_json::from_value(self.metadata.get(PACK_KEY).unwrap().clone())
-            .map_err(Error::DecodeKubecfgPackageMetadata)
+        serde_json::from_value(
+            self.metadata
+                .get(PACK_KEY)
+                .ok_or(Error::MissingMetadataKeyPack)?
+                .clone(),
+        )
+        .map_err(Error::DecodeKubecfgPackageMetadata)
     }
 
     pub fn versioned_kubecfg_image(&self, kubecfg_image: &str) -> Result<String> {
@@ -52,27 +80,27 @@ impl PackageConfig {
         Ok(format!("{}:{kubecfg_version}", kubecfg_image))
     }
 
-    pub fn schema(&self) -> String {
+    pub fn schema(&self) -> Result<String> {
         serde_json::to_string_pretty(
             self.metadata
-                .get("kubit.kubecfg.dev/v1alpha1")
-                .unwrap()
+                .get(KUBIT_KEY)
+                .ok_or(Error::MissingMetadataKeyKubit)?
                 .get("schema")
-                .unwrap(),
+                .ok_or(Error::MissingMetadataKeyKubitSchema)?,
         )
-        .unwrap()
+        .map_err(Error::SerializeJSONSchema)
     }
 
-    pub fn images(&self) -> Vec<String> {
+    pub fn images(&self) -> Result<Vec<String>> {
         serde_json::from_value(
             self.metadata
-                .get("oci.image.list")
-                .unwrap()
+                .get(IMAGE_LIST_KEY)
+                .ok_or(Error::MissingMetadataKeyImageList)?
                 .get("images")
-                .unwrap()
+                .ok_or(Error::MissingMetadataKeyImageListImages)?
                 .clone(),
         )
-        .unwrap()
+        .map_err(Error::SerializeImageList)
     }
 }
 

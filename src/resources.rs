@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
-use kube::CustomResource;
+use kube::{CustomResource, ResourceExt};
 use schemars::{
     schema::{Schema, SchemaObject},
     JsonSchema,
@@ -26,6 +26,12 @@ pub struct AppInstanceSpec {
     #[serde(default)]
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub pause: bool,
+}
+
+impl AppInstance {
+    pub fn namespace_any(&self) -> String {
+        self.namespace().unwrap_or_default()
+    }
 }
 
 // Like k8s_openapi::api::core::v1::LocalObjectReference but derives JsonSchema

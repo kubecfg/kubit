@@ -223,7 +223,7 @@ async fn reconciliation_state(
     app_instance: &AppInstance,
     ctx: &Context,
 ) -> Result<ReconciliationState> {
-    let ns = app_instance.namespace().unwrap();
+    let ns = app_instance.namespace_any();
     let api: Api<Job> = Api::namespaced(ctx.client.clone(), &ns);
     let job_name = job_name_for(app_instance);
     let job = api.get_opt(&job_name).await?;
@@ -324,7 +324,7 @@ fn patch_params() -> PatchParams {
 }
 
 async fn setup_job_rbac(app_instance: &AppInstance, ctx: &Context) -> Result<()> {
-    let ns = app_instance.clone().namespace().unwrap();
+    let ns = app_instance.clone().namespace_any();
     let pp = patch_params();
 
     let metadata = ObjectMeta {

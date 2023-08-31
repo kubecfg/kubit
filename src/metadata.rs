@@ -23,13 +23,13 @@ pub async fn run(schema: &Metadata) -> Result<()> {
     match schema {
         Metadata::Schema { app_instance } => {
             let config = fetch_package_config(app_instance).await?;
-            let schema = config.schema();
+            let schema = config.schema()?;
             println!("{schema}");
         }
         Metadata::Images { app_instance } => {
             let config = fetch_package_config(app_instance).await?;
             let images = config.images();
-            for image in images {
+            for image in images? {
                 println!("{image}");
             }
         }
