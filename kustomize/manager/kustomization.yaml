@@ -3,6 +3,8 @@ kind: Kustomization
 
 resources:
   - manager.yaml
+configurations:
+  - nameReferences.yaml
 images:
   - name: controller
     newName: ghcr.io/kubecfg/kubit
