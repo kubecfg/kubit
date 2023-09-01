@@ -122,7 +122,7 @@ fn get_applyset_id(app_instance: &AppInstance) -> Result<String> {
         .arg("get")
         .arg("secret")
         .arg("-n")
-        .arg(app_instance.namespace().unwrap())
+        .arg(app_instance.namespace_any())
         .arg(app_instance.name_any())
         .arg("-o")
         .arg("jsonpath={.metadata.labels.applyset\\.kubernetes\\.io/id}")

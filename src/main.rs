@@ -107,15 +107,17 @@ async fn main() -> anyhow::Result<()> {
                 let mut out_writer: Box<dyn Write> = match crd_dir {
                     Some(dir) => {
                         let crd_file = format!("{}_{}.yaml", crd.spec.group, crd.spec.names.plural);
-                        let file = File::create(dir.join(crd_file))
-                            .expect("Could not open AppInstances CRD file");
+                        let file = File::create(dir.join(crd_file)).map_err(|e| {
+                            anyhow::anyhow!("Could not open AppInstances CRD file: {e}")
+                        })?;
+
                         Box::new(file)
                     }
                     None => Box::new(stdout()),
                 };
                 // The YAML delimiter is added in the event we have multiple documents.
-                writeln!(out_writer, "---").unwrap();
-                serde_yaml::to_writer(out_writer, &crd).unwrap();
+                writeln!(out_writer, "---")?;
+                serde_yaml::to_writer(out_writer, &crd)?;
             }
         }
         Some(Commands::Metadata { metadata }) => metadata::run(metadata).await?,
