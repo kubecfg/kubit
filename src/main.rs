@@ -30,8 +30,19 @@ async fn main() -> anyhow::Result<()> {
         #[clap(flatten)]
         admin: kubert::AdminArgs,
 
-        #[clap(long, default_value = "ghcr.io/kubecfg/kubecfg/kubecfg")]
+        #[clap(
+            long,
+            env = "KUBIT_KUBECFG_IMAGE",
+            default_value = "ghcr.io/kubecfg/kubecfg/kubecfg"
+        )]
         kubecfg_image: String,
+
+        #[clap(
+            long,
+            env = "KUBIT_KUBIT_IMAGE",
+           default_value = concat!("ghcr.io/kubecfg/kubit:v", env!("CARGO_PKG_VERSION"))
+        )]
+        kubit_image: String,
 
         /// If true, processes only paused instances
         #[clap(long, default_value = "false")]
@@ -95,6 +106,7 @@ async fn main() -> anyhow::Result<()> {
         client,
         admin,
         kubecfg_image,
+        kubit_image,
         command,
         only_paused,
     } = Args::parse();
@@ -107,15 +119,17 @@ async fn main() -> anyhow::Result<()> {
                 let mut out_writer: Box<dyn Write> = match crd_dir {
                     Some(dir) => {
                         let crd_file = format!("{}_{}.yaml", crd.spec.group, crd.spec.names.plural);
-                        let file = File::create(dir.join(crd_file))
-                            .expect("Could not open AppInstances CRD file");
+                        let file = File::create(dir.join(crd_file)).map_err(|e| {
+                            anyhow::anyhow!("Could not open AppInstances CRD file: {e}")
+                        })?;
+
                         Box::new(file)
                     }
                     None => Box::new(stdout()),
                 };
                 // The YAML delimiter is added in the event we have multiple documents.
-                writeln!(out_writer, "---").unwrap();
-                serde_yaml::to_writer(out_writer, &crd).unwrap();
+                writeln!(out_writer, "---")?;
+                serde_yaml::to_writer(out_writer, &crd)?;
             }
         }
         Some(Commands::Metadata { metadata }) => metadata::run(metadata).await?,
@@ -144,7 +158,7 @@ async fn main() -> anyhow::Result<()> {
                 .build()
                 .await?;
 
-            let controller = controller::run(rt.client(), kubecfg_image, only_paused);
+            let controller = controller::run(rt.client(), kubecfg_image, kubit_image, only_paused);
 
             // Both runtimes implements graceful shutdown, so poll until both are done
             tokio::join!(controller, rt.run()).1?;

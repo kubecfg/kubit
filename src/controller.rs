@@ -38,14 +38,14 @@ use crate::{
     Error, Result,
 };
 
-const KUBECTL_IMAGE: &str =
-    "bitnami/kubectl@sha256:d5229eb7ad4fa8e8cb9004e63b6b257fe5c925de4bde9c6fcbee5e758c08cc13";
+const KUBECTL_IMAGE: &str = "registry.k8s.io/kubectl:v1.28.0";
 
 const APPLIER_SERVICE_ACCOUNT: &str = "kubit-applier";
 
 struct Context {
     client: Client,
     kubecfg_image: String,
+    kubit_image: String,
     only_paused: bool,
 }
 
@@ -56,7 +56,12 @@ fn error_policy(app_instance: Arc<AppInstance>, error: &Error, _ctx: Arc<Context
     Action::requeue(Duration::from_secs(5))
 }
 
-pub async fn run(client: Client, kubecfg_image: String, only_paused: bool) -> Result<()> {
+pub async fn run(
+    client: Client,
+    kubecfg_image: String,
+    kubit_image: String,
+    only_paused: bool,
+) -> Result<()> {
     let docs = Api::<AppInstance>::all(client.clone());
     if let Err(e) = docs.list(&ListParams::default().limit(1)).await {
         error!("CRD is not queryable; {e:?}. Is the CRD installed?");
@@ -74,6 +79,7 @@ pub async fn run(client: Client, kubecfg_image: String, only_paused: bool) -> Re
             Arc::new(Context {
                 client,
                 kubecfg_image,
+                kubit_image,
                 only_paused,
             }),
         )
@@ -223,7 +229,7 @@ async fn reconciliation_state(
     app_instance: &AppInstance,
     ctx: &Context,
 ) -> Result<ReconciliationState> {
-    let ns = app_instance.namespace().unwrap();
+    let ns = app_instance.namespace_any();
     let api: Api<Job> = Api::namespaced(ctx.client.clone(), &ns);
     let job_name = job_name_for(app_instance);
     let job = api.get_opt(&job_name).await?;
@@ -324,7 +330,7 @@ fn patch_params() -> PatchParams {
 }
 
 async fn setup_job_rbac(app_instance: &AppInstance, ctx: &Context) -> Result<()> {
-    let ns = app_instance.clone().namespace().unwrap();
+    let ns = app_instance.clone().namespace_any();
     let pp = patch_params();
 
     let metadata = ObjectMeta {
@@ -490,15 +496,12 @@ async fn create_job(
                     init_containers: Some(vec![
                         Container {
                             name: "fetch-app-instance".to_string(),
-                            image: Some(KUBECTL_IMAGE.to_string()),
-                            command: Some(
-                                ["/bin/bash", "-c"].iter().map(|s| s.to_string()).collect(),
-                            ),
-                            args: Some(vec![render::emit_fetch_app_instance_script(
+                            image: Some(ctx.kubit_image.clone()),
+                            command: Some(render::emit_fetch_app_instance_commandline(
                                 ns,
                                 &app_instance.name_any(),
                                 "/overlay/appinstance.json",
-                            )]),
+                            )),
                             ..container_defaults.clone()
                         },
                         Container {

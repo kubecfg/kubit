@@ -34,7 +34,7 @@ pub fn emit_commandline(
         "-f",
         manifests_dir,
         "-n",
-        &app_instance.namespace().unwrap(),
+        &app_instance.namespace_any(),
         "--server-side",
         "--prune",
         "--applyset",

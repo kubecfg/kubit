@@ -107,7 +107,7 @@ mod tests {
         let auth = config.get_auth("us-docker.pkg.dev").expect("no errors");
         assert_matches!(auth, RegistryAuth::Basic(username, password) if username == "foo" && password == "hunter12");
 
-        let auth = config.get_auth("bitnami/kubectl").expect("no errors");
+        let auth = config.get_auth("registry.k8s.io").expect("no errors");
         assert_matches!(auth, RegistryAuth::Anonymous);
     }
 

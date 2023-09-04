@@ -1,8 +1,8 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Subcommand;
 use kube::ResourceExt;
 use std::fs::{self, File};
-use std::io::{stdout, Write};
+use std::io::{stdout, IsTerminal, Read, Write};
 use std::os::unix::prelude::PermissionsExt;
 use std::process::Command;
 
@@ -24,6 +24,10 @@ pub enum Local {
         #[clap(long)]
         dry_run: Option<DryRun>,
 
+        /// Show diff before applying. If in tty, interactively ask if you want to continue.
+        #[clap(long("diff"), default_value = "false")]
+        pre_diff: bool,
+
         /// Override the package image field in the spec
         #[clap(long)]
         package_image: Option<String>,
@@ -43,8 +47,15 @@ pub fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()> {
             app_instance,
             dry_run,
             package_image,
+            pre_diff,
         } => {
-            apply(app_instance, dry_run, package_image, impersonate_user)?;
+            apply(
+                app_instance,
+                dry_run,
+                package_image,
+                impersonate_user,
+                *pre_diff,
+            )?;
         }
     };
     Ok(())
@@ -56,6 +67,7 @@ pub fn apply(
     dry_run: &Option<DryRun>,
     package_image: &Option<String>,
     impersonate_user: &Option<String>,
+    pre_diff: bool,
 ) -> Result<()> {
     let (mut output, path): (Box<dyn Write>, _) = if matches!(dry_run, Some(DryRun::Script)) {
         (Box::new(stdout()), None)
@@ -71,6 +83,22 @@ pub fn apply(
 
     if let Some(package_image) = package_image {
         app_instance.spec.package.image = package_image.clone();
+    }
+
+    if pre_diff {
+        if dry_run.is_some() {
+            bail!("--diff and --dry-run are mutually exclusive");
+        }
+        apply(
+            overlay_file_name,
+            &Some(DryRun::Diff),
+            package_image,
+            impersonate_user,
+            false,
+        )?;
+        if !confirm_continue() {
+            return Ok(());
+        }
     }
 
     let steps = vec![
@@ -122,11 +150,31 @@ fn get_applyset_id(app_instance: &AppInstance) -> Result<String> {
         .arg("get")
         .arg("secret")
         .arg("-n")
-        .arg(app_instance.namespace().unwrap())
+        .arg(app_instance.namespace_any())
         .arg(app_instance.name_any())
         .arg("-o")
         .arg("jsonpath={.metadata.labels.applyset\\.kubernetes\\.io/id}")
         .output()?
         .stdout;
     Ok(String::from_utf8(out)?)
+}
+
+pub fn confirm_continue() -> bool {
+    if !std::io::stdout().is_terminal() {
+        return true;
+    }
+
+    print!("Apply? [y/N] ");
+    std::io::stdout().flush().unwrap();
+
+    /*
+    let is_tty = unsafe { libc::isatty(libc::STDIN_FILENO as i32) } != 0;
+    if !is_tty {
+        return true;
+    }
+    */
+
+    let mut buffer = [0; 1];
+    std::io::stdin().read_exact(&mut buffer).unwrap();
+    matches!(buffer[0], b'y' | b'Y')
 }
