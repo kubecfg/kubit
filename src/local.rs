@@ -55,6 +55,7 @@ pub fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()> {
                 package_image,
                 impersonate_user,
                 *pre_diff,
+                true,
             )?;
         }
     };
@@ -68,6 +69,7 @@ pub fn apply(
     package_image: &Option<String>,
     impersonate_user: &Option<String>,
     pre_diff: bool,
+    is_local: bool,
 ) -> Result<()> {
     let (mut output, path): (Box<dyn Write>, _) = if matches!(dry_run, Some(DryRun::Script)) {
         (Box::new(stdout()), None)
@@ -136,7 +138,7 @@ fn diff(app_instance: &AppInstance) -> Result<Script> {
 // Workaround for issue: https://github.com/kubernetes/kubectl/issues/1265
 fn apply_label_workaround() -> Script {
     Script::from_str(
-        r#"apply_label() {  
+        r#"apply_label() {
         kubectl label --local -f - -o json "$1" \
         | jq -c . \
         | while read -r line; do echo '---'; echo "$line" | yq eval -P; done

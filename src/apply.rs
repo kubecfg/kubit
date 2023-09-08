@@ -4,11 +4,11 @@ use kube::ResourceExt;
 pub const KUBIT_APPLIER_FIELD_MANAGER: &str = "kubit-applier";
 
 /// Generates shell script that will apply the manifests and writes it to w
-pub fn emit_script<W>(app_instance: &AppInstance, w: &mut W) -> Result<()>
+pub fn emit_script<W>(app_instance: &AppInstance, is_local: bool, w: &mut W) -> Result<()>
 where
     W: std::io::Write,
 {
-    let script = script(app_instance, "/tmp/manifests", &None)?;
+    let script = script(app_instance, "/tmp/manifests", &None, is_local)?;
     write!(w, "{script}")?;
     Ok(())
 }
@@ -18,8 +18,9 @@ pub fn script(
     app_instance: &AppInstance,
     manifests_dir: &str,
     impersonate_user: &Option<String>,
+    is_local: bool,
 ) -> Result<Script> {
-    let tokens = emit_commandline(app_instance, manifests_dir, impersonate_user);
+    let tokens = emit_commandline(app_instance, manifests_dir, impersonate_user, is_local);
     Ok(Script::from_vec(tokens))
 }
 

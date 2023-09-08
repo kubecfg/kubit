@@ -143,8 +143,8 @@ async fn main() -> anyhow::Result<()> {
             let app_instance: AppInstance = serde_yaml::from_reader(file)?;
             let mut output = stdout().lock();
             match script {
-                Scripts::Render => render::emit_script(&app_instance, &mut output)?,
-                Scripts::Apply => apply::emit_script(&app_instance, &mut output)?,
+                Scripts::Render => render::emit_script(&app_instance, false, &mut output)?,
+                Scripts::Apply => apply::emit_script(&app_instance, false, &mut output)?,
             }
         }
         None => {

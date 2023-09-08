@@ -511,6 +511,7 @@ async fn create_job(
                                 app_instance,
                                 "/overlay/appinstance.json",
                                 Some("/manifests"),
+                                false,
                             )),
                             ..container_defaults.clone()
                         },
@@ -518,7 +519,12 @@ async fn create_job(
                     containers: vec![Container {
                         name: "apply-manifests".to_string(),
                         image: Some(KUBECTL_IMAGE.to_string()),
-                        command: Some(apply::emit_commandline(app_instance, "/manifests", &None)),
+                        command: Some(apply::emit_commandline(
+                            app_instance,
+                            "/manifests",
+                            &None,
+                            false,
+                        )),
                         ..container_defaults.clone()
                     }],
                     ..Default::default()

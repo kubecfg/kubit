@@ -1,7 +1,7 @@
 use crate::{resources::AppInstance, scripting::Script, Error, Result};
 
 /// Generates shell script that will render the manifest and writes it to writer.
-pub fn emit_script<W>(app_instance: &AppInstance, w: &mut W) -> Result<()>
+pub fn emit_script<W>(app_instance: &AppInstance, is_local: bool, w: &mut W) -> Result<()>
 where
     W: std::io::Write,
 {
@@ -13,6 +13,7 @@ where
         app_instance,
         &path.to_string_lossy(),
         Some("/tmp/manifests"),
+        is_local,
     )?;
     writeln!(w, "{script}")?;
     Ok(())
@@ -23,8 +24,9 @@ pub fn script(
     app_instance: &AppInstance,
     overlay_file_name: &str,
     output_dir: Option<&str>,
+    is_local: bool,
 ) -> Result<Script> {
-    let tokens = emit_commandline(app_instance, overlay_file_name, output_dir);
+    let tokens = emit_commandline(app_instance, overlay_file_name, output_dir, is_local);
     Ok(Script::from_vec(tokens))
 }
 
@@ -32,6 +34,7 @@ pub fn emit_commandline(
     app_instance: &AppInstance,
     overlay_file: &str,
     output_dir: Option<&str>,
+    is_local: bool,
 ) -> Vec<String> {
     let image = &app_instance.spec.package.image;
 
