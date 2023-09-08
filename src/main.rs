@@ -39,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
 
         #[clap(
             long,
-            env = "KUBIT_KUBIT_IMAGE",
+            env = "KUBIT_CONTROLLER_IMAGE",
            default_value = concat!("ghcr.io/kubecfg/kubit:v", env!("CARGO_PKG_VERSION"))
         )]
         kubit_image: String,
