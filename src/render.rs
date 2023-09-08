@@ -44,18 +44,48 @@ pub fn emit_commandline(
         format!("oci://{image}")
     };
 
-    let mut cli = [
-        "kubecfg",
-        "show",
-        "--alpha",
-        "--reorder=server",
-        &entrypoint,
-        "--overlay-code-file",
-        &format!("appInstance_={overlay_file}"),
-    ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect::<Vec<String>>();
+    let mut cli: Vec<String> = vec![];
+
+    if is_local {
+
+        let overlay_path = std::fs::canonicalize(overlay_file).unwrap();
+        let overlay_file_name = std::path::PathBuf::from(overlay_path.file_name().unwrap());
+        cli = vec![
+            "docker",
+            "run",
+            "--rm",
+            "-v",
+            &format!("{}/.kube/config:/.kube/config", std::env::home_dir().unwrap().display()), // TODO:
+            // use a crate as this is deprecated
+            "-v",
+            &format!("{}:/overlay/{}", overlay_path.display(), overlay_file_name.display()),
+            "-v",
+            &format!("{}/.docker/config.json:/.docker/config.json", std::env::home_dir().unwrap().display()),
+            &format!("ghcr.io/kubecfg/kubecfg/kubecfg:v0.32.0"), // TODO: don't hardcode it, take
+            // from package metadata
+            "show",
+            &entrypoint,
+            "--alpha",
+            "--reorder=server",
+            &format!("appInstance_=/overlay/{}", overlay_file_name.display()),
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+    } else {
+        cli = [
+            "kubecfg",
+            "show",
+            "--alpha",
+            "--reorder=server",
+            &entrypoint,
+            "--overlay-code-file",
+            &format!("appInstance_={overlay_file}"),
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+    }
 
     if let Some(output_dir) = output_dir {
         const FORMAT: &str = "{{printf \"%03d\" (resourceIndex .)}}-{{.apiVersion}}.{{.kind}}-{{default \"default\" .metadata.namespace}}.{{.metadata.name}}";

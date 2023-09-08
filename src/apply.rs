@@ -28,26 +28,56 @@ pub fn emit_commandline(
     app_instance: &AppInstance,
     manifests_dir: &str,
     impersonate_user: &Option<String>,
+    is_local: bool,
 ) -> Vec<String> {
-    let mut cli = vec![
-        "kubectl",
-        "apply",
-        "-f",
-        manifests_dir,
-        "-n",
-        &app_instance.namespace_any(),
-        "--server-side",
-        "--prune",
-        "--applyset",
-        &app_instance.name_any(),
-        "--field-manager",
-        KUBIT_APPLIER_FIELD_MANAGER,
-        "--force-conflicts",
-        "-v=2",
-    ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect::<Vec<_>>();
+    let mut cli: Vec<String> = vec![];
+
+    if is_local {
+        cli = vec![
+            "docker",
+            "run",
+            "--rm",
+            "-v",
+            "$HOME/.kube/config:/.kube/config",
+            &format!("{manifests_dir}:{manifests_dir}"),
+            "apply",
+            "-f",
+            manifests_dir,
+            "-n",
+            &app_instance.namespace_any(),
+            "--server-side",
+            "--prune",
+            "--applyset",
+            &app_instance.name_any(),
+            "--field-manager",
+            KUBIT_APPLIER_FIELD_MANAGER,
+            "--force-conflicts",
+            "-v=2",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+    } else {
+        cli = vec![
+            "kubectl",
+            "apply",
+            "-f",
+            manifests_dir,
+            "-n",
+            &app_instance.namespace_any(),
+            "--server-side",
+            "--prune",
+            "--applyset",
+            &app_instance.name_any(),
+            "--field-manager",
+            KUBIT_APPLIER_FIELD_MANAGER,
+            "--force-conflicts",
+            "-v=2",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+    }
 
     if let Some(as_user) = impersonate_user {
         cli.push(format!("--as={as_user}"));

@@ -97,21 +97,41 @@ pub fn apply(
             package_image,
             impersonate_user,
             false,
+            true,
         )?;
         if !confirm_continue() {
             return Ok(());
         }
     }
 
-    let steps = vec![
-        Script::from_str("export KUBECTL_APPLYSET=true"),
-        render::script(&app_instance, overlay_file_name, None)?
-            | match dry_run {
-                Some(DryRun::Render) => Script::from_str("cat"),
-                Some(DryRun::Diff) => diff(&app_instance)?,
-                Some(DryRun::Script) | None => apply::script(&app_instance, "-", impersonate_user)?,
-            },
-    ];
+    let mut steps: Vec<Script> = vec![];
+
+    if is_local {
+        steps = vec![
+            Script::from_str("export KUBECTL_APPLYSET=true"),
+            render::script(&app_instance, overlay_file_name, None, is_local)?
+                | match dry_run {
+                    Some(DryRun::Render) => Script::from_str("cat"),
+                    Some(DryRun::Diff) => diff(&app_instance)?,
+                    Some(DryRun::Script) | None => {
+                        apply::script(&app_instance, "-", impersonate_user, is_local)?
+                    }
+                },
+        ];
+    } else {
+        steps = vec![
+            Script::from_str("export KUBECTL_APPLYSET=true"),
+            render::script(&app_instance, overlay_file_name, None, is_local)?
+                | match dry_run {
+                    Some(DryRun::Render) => Script::from_str("cat"),
+                    Some(DryRun::Diff) => diff(&app_instance)?,
+                    Some(DryRun::Script) | None => {
+                        apply::script(&app_instance, "-", impersonate_user, is_local)?
+                    }
+                },
+        ];
+    }
+
     let script: Script = steps.into_iter().sum();
 
     writeln!(output, "{script}")?;
