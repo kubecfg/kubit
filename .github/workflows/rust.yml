@@ -61,6 +61,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: false
           tags: ghcr.io/kubecfg/kubit:latest
+          load: true
       - name: Test
         run: |
           docker run --rm ghcr.io/kubecfg/kubit:latest --version
