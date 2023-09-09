@@ -43,6 +43,8 @@ jobs:
       - uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac # v4
       - name: Set up Depot Docker Build
         uses: depot/setup-action@0cd1716c2eb8606eee7f18de8f87fddd0e1c2fd2 # v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
       - name: Login to GHCR
         uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc # v2
         with:
@@ -59,6 +61,9 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: false
           tags: ghcr.io/kubecfg/kubit:latest
+      - name: Test
+        run: |
+          docker run --rm ghcr.io/kubecfg/kubit:latest --version
       - name: Push
         uses: depot/build-push-action@39acb3f766a908058e746f5c7a166f73e4cdcb17 # v1
         with:
