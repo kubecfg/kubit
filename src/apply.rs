@@ -47,6 +47,7 @@ pub fn emit_commandline(
                 "docker",
                 "run",
                 "--rm",
+                "--network=host",
                 "-v",
                 &format!("{}:/.kube/config", kube_config),
                 "--env",
