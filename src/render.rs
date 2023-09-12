@@ -1,5 +1,6 @@
 use crate::{resources::AppInstance, scripting::Script, Error, Result};
 use home::home_dir;
+use std::env;
 
 /// Generates shell script that will render the manifest and writes it to writer.
 pub fn emit_script<W>(app_instance: &AppInstance, is_local: bool, w: &mut W) -> Result<()>
@@ -50,9 +51,9 @@ pub fn emit_commandline(
     let overlay_file_name = std::path::PathBuf::from(overlay_path.file_name().unwrap());
     let user_home = home_dir().expect("unable to retrieve home directory");
     let docker_config =
-        std::env::var("DOCKER_CONFIG").unwrap_or(format!("{}/.docker", user_home.display()));
+        env::var("DOCKER_CONFIG").unwrap_or(format!("{}/.docker", user_home.display()));
     let kube_config =
-        std::env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
+        env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
 
     if is_local {
         cli.extend(
