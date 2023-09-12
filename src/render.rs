@@ -68,11 +68,11 @@ pub fn emit_commandline(
                 ),
                 "-v",
                 &format!("{}:/.docker", docker_config),
-                // DOCKER_CONFIG within the container, not for the user
+                // DOCKER_CONFIG within the container
                 "--env",
                 "DOCKER_CONFIG=/.docker",
                 // TODO: don't hardcode it, take from package metadata
-                "ghcr.io/kubecfg/kubecfg/kubecfg:v0.32.0",
+                "ghcr.io/kubecfg/kubecfg/kubecfg:v0.33.0",
             ]
             .iter()
             .map(|s| s.to_string())
