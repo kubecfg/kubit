@@ -33,35 +33,33 @@ pub fn emit_commandline(
     let mut cli: Vec<String> = vec![];
 
     if is_local {
-        cli = vec![
-            "docker",
-            "run",
-            "--rm",
-            "-v",
-            "$HOME/.kube/config:/.kube/config",
-            &format!("{manifests_dir}:{manifests_dir}"),
-            "--env",
-            "KUBECTL_APPLYSET=true", // TODO: this can be a const
-            "apply",
-            "-f",
-            manifests_dir, // Can be - for stdin
-            "-n",
-            &app_instance.namespace_any(),
-            "--server-side",
-            "--prune",
-            "--applyset",
-            &app_instance.name_any(),
-            "--field-manager",
-            KUBIT_APPLIER_FIELD_MANAGER,
-            "--force-conflicts",
-            "-v=2",
-        ]
-        .iter()
-        .map(|s| s.to_string())
-        .collect::<Vec<_>>();
+        cli.extend(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "-v",
+                "$HOME/.kube/config:/.kube/config",
+                &format!("{manifests_dir}:{manifests_dir}"),
+                "--env",
+                "KUBECTL_APPLYSET=true", // TODO: this can be a const
+                "bitnami/kubectl:v1.27",
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>(),
+        );
     } else {
-        cli = vec![
-            "kubectl",
+        cli.extend(
+            ["kubectl"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    cli.extend(
+        [
             "apply",
             "-f",
             manifests_dir,
@@ -78,8 +76,8 @@ pub fn emit_commandline(
         ]
         .iter()
         .map(|s| s.to_string())
-        .collect::<Vec<_>>();
-    }
+        .collect::<Vec<_>>(),
+    );
 
     if let Some(as_user) = impersonate_user {
         cli.push(format!("--as={as_user}"));

@@ -107,7 +107,7 @@ pub fn apply(
     let mut steps: Vec<Script> = vec![];
 
     if is_local {
-        steps = vec![
+        steps.extend([
             render::script(&app_instance, overlay_file_name, None, is_local)?
                 | match dry_run {
                     Some(DryRun::Render) => Script::from_str("cat"),
@@ -116,9 +116,9 @@ pub fn apply(
                         apply::script(&app_instance, "-", impersonate_user, is_local)?
                     }
                 },
-        ];
+        ]);
     } else {
-        steps = vec![
+        steps.extend([
             Script::from_str("export KUBECTL_APPLYSET=true"),
             render::script(&app_instance, overlay_file_name, None, is_local)?
                 | match dry_run {
@@ -128,7 +128,7 @@ pub fn apply(
                         apply::script(&app_instance, "-", impersonate_user, is_local)?
                     }
                 },
-        ];
+        ]);
     }
 
     let script: Script = steps.into_iter().sum();
