@@ -1,4 +1,5 @@
 use crate::{resources::AppInstance, scripting::Script, Error, Result};
+use home::home_dir;
 
 /// Generates shell script that will render the manifest and writes it to writer.
 pub fn emit_script<W>(app_instance: &AppInstance, is_local: bool, w: &mut W) -> Result<()>
@@ -47,20 +48,29 @@ pub fn emit_commandline(
     let mut cli: Vec<String> = vec![];
 
     if is_local {
-
         let overlay_path = std::fs::canonicalize(overlay_file).unwrap();
         let overlay_file_name = std::path::PathBuf::from(overlay_path.file_name().unwrap());
+        let user_home = home_dir().expect("unable to retrieve home directory");
+
         cli = vec![
             "docker",
             "run",
             "--rm",
             "-v",
-            &format!("{}/.kube/config:/.kube/config", std::env::home_dir().unwrap().display()), // TODO:
-            // use a crate as this is deprecated
+            &format!("{}/.kube/config:/.kube/config", user_home.display()),
             "-v",
-            &format!("{}:/overlay/{}", overlay_path.display(), overlay_file_name.display()),
+            &format!(
+                "{}:/overlay/{}",
+                overlay_path.display(),
+                overlay_file_name.display()
+            ),
             "-v",
-            &format!("{}/.docker/config.json:/.docker/config.json", std::env::home_dir().unwrap().display()),
+            &format!(
+                "{}/.docker/config.json:/.docker/config.json:ro",
+                user_home.display()
+            ),
+            "--env",
+            "DOCKER_CONFIG=/.docker",
             &format!("ghcr.io/kubecfg/kubecfg/kubecfg:v0.32.0"), // TODO: don't hardcode it, take
             // from package metadata
             "show",
