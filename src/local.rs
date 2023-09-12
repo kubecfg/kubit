@@ -108,7 +108,6 @@ pub fn apply(
 
     if is_local {
         steps = vec![
-            Script::from_str("export KUBECTL_APPLYSET=true"),
             render::script(&app_instance, overlay_file_name, None, is_local)?
                 | match dry_run {
                     Some(DryRun::Render) => Script::from_str("cat"),

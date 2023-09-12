@@ -40,9 +40,11 @@ pub fn emit_commandline(
             "-v",
             "$HOME/.kube/config:/.kube/config",
             &format!("{manifests_dir}:{manifests_dir}"),
+            "--env",
+            "KUBECTL_APPLYSET=true", // TODO: this can be a const
             "apply",
             "-f",
-            manifests_dir,
+            manifests_dir, // Can be - for stdin
             "-n",
             &app_instance.namespace_any(),
             "--server-side",
