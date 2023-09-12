@@ -1,5 +1,7 @@
 use crate::{resources::AppInstance, scripting::Script, Result};
+use home::home_dir;
 use kube::ResourceExt;
+use std::env;
 
 pub const KUBIT_APPLIER_FIELD_MANAGER: &str = "kubit-applier";
 
@@ -32,6 +34,11 @@ pub fn emit_commandline(
 ) -> Vec<String> {
     let mut cli: Vec<String> = vec![];
 
+    // TODO: shared with `render.rs`, refactor when functionality is correct.
+    let user_home = home_dir().expect("unable to retrieve home directory");
+    let kube_config =
+        env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
+
     if is_local {
         cli.extend(
             [
@@ -39,11 +46,12 @@ pub fn emit_commandline(
                 "run",
                 "--rm",
                 "-v",
-                "$HOME/.kube/config:/.kube/config",
-                &format!("{manifests_dir}:{manifests_dir}"),
+                &format!("{}:/.kube/config", kube_config),
                 "--env",
                 "KUBECTL_APPLYSET=true", // TODO: this can be a const
-                "bitnami/kubectl:v1.27",
+                "--env",
+                "KUBECONFIG=/.kube/config",
+                "bitnami/kubectl:1.27.5",
             ]
             .iter()
             .map(|s| s.to_string())
