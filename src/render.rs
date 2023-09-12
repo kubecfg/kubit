@@ -51,6 +51,8 @@ pub fn emit_commandline(
     let user_home = home_dir().expect("unable to retrieve home directory");
     let docker_config =
         std::env::var("DOCKER_CONFIG").unwrap_or(format!("{}/.docker", user_home.display()));
+    let kube_config =
+        std::env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
 
     if is_local {
         cli.extend(
@@ -59,7 +61,7 @@ pub fn emit_commandline(
                 "run",
                 "--rm",
                 "-v",
-                &format!("{}/.kube/config:/.kube/config", user_home.display()),
+                &format!("{}:/.kube/config", kube_config),
                 "-v",
                 &format!(
                     "{}:/overlay/{}",
@@ -71,6 +73,8 @@ pub fn emit_commandline(
                 // DOCKER_CONFIG within the container
                 "--env",
                 "DOCKER_CONFIG=/.docker",
+                "--env",
+                "KUBECONFIG=/.kube/config",
                 // TODO: don't hardcode it, take from package metadata
                 "ghcr.io/kubecfg/kubecfg/kubecfg:v0.33.0",
             ]
@@ -86,7 +90,7 @@ pub fn emit_commandline(
     }
 
     cli.extend(
-        ["show", &entrypoint, "--alpha", "--reorder=server", "-v=9"]
+        ["show", &entrypoint, "--alpha", "--reorder=server"]
             .iter()
             .map(|s| s.to_string())
             .collect::<Vec<_>>(),
