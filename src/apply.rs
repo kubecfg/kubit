@@ -4,6 +4,8 @@ use kube::ResourceExt;
 use std::env;
 
 pub const KUBIT_APPLIER_FIELD_MANAGER: &str = "kubit-applier";
+pub const KUBECTL_IMAGE: &str = "bitnami/kubectl:1.27.5";
+const KUBECTL_APPLYSET_ENABLED: &str = "KUBECTL_APPLYSET=true";
 
 /// Generates shell script that will apply the manifests and writes it to w
 pub fn emit_script<W>(app_instance: &AppInstance, is_local: bool, w: &mut W) -> Result<()>
@@ -48,10 +50,10 @@ pub fn emit_commandline(
                 "-v",
                 &format!("{}:/.kube/config", kube_config),
                 "--env",
-                "KUBECTL_APPLYSET=true", // TODO: this can be a const
+                KUBECTL_APPLYSET_ENABLED,
                 "--env",
                 "KUBECONFIG=/.kube/config",
-                "bitnami/kubectl:1.27.5",
+                KUBECTL_IMAGE,
             ]
             .iter()
             .map(|s| s.to_string())
