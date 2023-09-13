@@ -20,7 +20,7 @@ This means that the installation experience is decoupled from the language of ch
 ### Kubernetes controller
 
 ```bash
-kubectl apply -k 'https://github.com/kubecfg/kubit//kustomize/global?ref=v0.0.10'
+kubectl apply -k 'https://github.com/kubecfg/kubit//kustomize/global?ref=v0.0.11'
 ```
 
 The Kubernetes controller is the main way to use kubit.
@@ -40,7 +40,7 @@ brew install kubecfg/kubit/kubit
 Direct install from sources:
 
 ```bash
-cargo install --git https://github.com/kubecfg/kubit/ --tag v0.0.10
+cargo install --git https://github.com/kubecfg/kubit/ --tag v0.0.11
 ```
 
 The CLI is an optional tool that provides helpers and alternative ways to install and inspect packages.
