@@ -74,8 +74,6 @@ pub fn emit_commandline(
     cli.extend(
         [
             "apply",
-            "-f",
-            manifests_dir,
             "-n",
             &app_instance.namespace_any(),
             "--server-side",
@@ -86,6 +84,8 @@ pub fn emit_commandline(
             KUBIT_APPLIER_FIELD_MANAGER,
             "--force-conflicts",
             "-v=2",
+            "-f",
+            manifests_dir,
         ]
         .iter()
         .map(|s| s.to_string())
