@@ -4,7 +4,9 @@ use kube::ResourceExt;
 use std::fs::{self, File};
 use std::io::{stdout, IsTerminal, Read, Write};
 use std::os::unix::prelude::PermissionsExt;
+use std::path::PathBuf;
 use std::process::Command;
+use tempfile::NamedTempFile;
 
 use crate::{
     apply::{self, KUBIT_APPLIER_FIELD_MANAGER},
@@ -62,6 +64,54 @@ pub fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()> {
     Ok(())
 }
 
+/// This trait allows us to close the temporary file but not delete it yet
+trait DeferredDelete {
+    fn close(self: Box<Self>) -> std::io::Result<Option<DeferredDeleteHandle>>;
+}
+
+struct DeferredDeleteHandle {
+    path: PathBuf,
+}
+
+impl Drop for DeferredDeleteHandle {
+    fn drop(&mut self) {
+        fs::remove_file(self.path.clone()).unwrap()
+    }
+}
+
+impl DeferredDelete for NamedTempFile {
+    fn close(self: Box<Self>) -> std::io::Result<Option<DeferredDeleteHandle>> {
+        let path = self.path().to_path_buf();
+        self.persist(path.clone())?;
+        Ok(Some(DeferredDeleteHandle { path }))
+    }
+}
+
+struct NopDeferredDelete<W>(W);
+
+impl<W> DeferredDelete for NopDeferredDelete<W> {
+    fn close(self: Box<Self>) -> std::io::Result<Option<DeferredDeleteHandle>> {
+        Ok(None)
+    }
+}
+
+impl<W> Write for NopDeferredDelete<W>
+where
+    W: Write,
+{
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.0.flush()
+    }
+}
+
+trait WriteClose: Write + DeferredDelete {}
+impl<W: Write> WriteClose for NopDeferredDelete<W> {}
+impl WriteClose for NamedTempFile {}
+
 /// Generate a script that runs kubecfg show and kubectl apply and runs it.
 pub fn apply(
     app_instance: &str,
@@ -71,8 +121,8 @@ pub fn apply(
     pre_diff: bool,
     is_local: bool,
 ) -> Result<()> {
-    let (mut output, path): (Box<dyn Write>, _) = if matches!(dry_run, Some(DryRun::Script)) {
-        (Box::new(stdout()), None)
+    let (mut output, path): (Box<dyn WriteClose>, _) = if matches!(dry_run, Some(DryRun::Script)) {
+        (Box::new(NopDeferredDelete(stdout())), None)
     } else {
         let tmp = tempfile::Builder::new().suffix(".sh").tempfile()?;
         let path = tmp.path().to_path_buf();
@@ -134,6 +184,9 @@ pub fn apply(
     let script: Script = steps.into_iter().sum();
 
     writeln!(output, "{script}")?;
+
+    // close the file but don't delete it until _deferred_delete_handle local var is in scope.
+    let _deferred_delete_handle = output.close()?;
 
     if let Some(path) = path {
         fs::set_permissions(&path, fs::Permissions::from_mode(0o755))?;
