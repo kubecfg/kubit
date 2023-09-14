@@ -7,6 +7,7 @@ use std::os::unix::prelude::PermissionsExt;
 use std::path::PathBuf;
 use std::process::Command;
 use tempfile::NamedTempFile;
+use std::future::Future;
 
 use crate::{
     apply::{self, KUBIT_APPLIER_FIELD_MANAGER},
@@ -43,7 +44,7 @@ pub enum DryRun {
     Script,
 }
 
-pub fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()> {
+pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()> {
     match local {
         Local::Apply {
             app_instance,
@@ -58,7 +59,7 @@ pub fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()> {
                 impersonate_user,
                 *pre_diff,
                 true,
-            )?;
+            ).await?;
         }
     };
     Ok(())
@@ -113,14 +114,14 @@ impl<W: Write> WriteClose for NopDeferredDelete<W> {}
 impl WriteClose for NamedTempFile {}
 
 /// Generate a script that runs kubecfg show and kubectl apply and runs it.
-pub fn apply(
+pub async fn apply(
     app_instance: &str,
     dry_run: &Option<DryRun>,
     package_image: &Option<String>,
     impersonate_user: &Option<String>,
     pre_diff: bool,
     is_local: bool,
-) -> Result<()> {
+) -> Box<dyn Future<Output = ()>, Result<()>> {
     let (mut output, path): (Box<dyn WriteClose>, _) = if matches!(dry_run, Some(DryRun::Script)) {
         (Box::new(NopDeferredDelete(stdout())), None)
     } else {
@@ -148,7 +149,7 @@ pub fn apply(
             impersonate_user,
             false,
             true,
-        )?;
+        ).await?;
         if !confirm_continue() {
             return Ok(());
         }
@@ -158,7 +159,7 @@ pub fn apply(
 
     if is_local {
         steps.extend([
-            render::script(&app_instance, overlay_file_name, None, is_local)?
+            render::script(&app_instance, overlay_file_name, None, is_local).await?
                 | match dry_run {
                     Some(DryRun::Render) => Script::from_str("cat"),
                     Some(DryRun::Diff) => diff(&app_instance)?,
@@ -170,7 +171,7 @@ pub fn apply(
     } else {
         steps.extend([
             Script::from_str("export KUBECTL_APPLYSET=true"),
-            render::script(&app_instance, overlay_file_name, None, is_local)?
+            render::script(&app_instance, overlay_file_name, None, is_local).await?
                 | match dry_run {
                     Some(DryRun::Render) => Script::from_str("cat"),
                     Some(DryRun::Diff) => diff(&app_instance)?,

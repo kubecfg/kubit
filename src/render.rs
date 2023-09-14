@@ -1,4 +1,4 @@
-use crate::{resources::AppInstance, scripting::Script, Error, Result};
+use crate::{resources::AppInstance, scripting::Script, Error, Result, metadata};
 use home::home_dir;
 use std::env;
 
@@ -22,17 +22,17 @@ where
 }
 
 /// Generates shell script that will render the manifest
-pub fn script(
+pub async fn script(
     app_instance: &AppInstance,
     overlay_file_name: &str,
     output_dir: Option<&str>,
     is_local: bool,
 ) -> Result<Script> {
-    let tokens = emit_commandline(app_instance, overlay_file_name, output_dir, is_local);
+    let tokens = emit_commandline(app_instance, overlay_file_name, output_dir, is_local).await;
     Ok(Script::from_vec(tokens))
 }
 
-pub fn emit_commandline(
+pub async fn emit_commandline(
     app_instance: &AppInstance,
     overlay_file: &str,
     output_dir: Option<&str>,
@@ -56,6 +56,12 @@ pub fn emit_commandline(
         env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
 
     if is_local {
+
+        let app_instance = serde_yaml::to_string(&app_instance).expect("unable to serialize app_instance");
+        let meta = metadata::fetch_package_config(&app_instance).await.unwrap();
+        let package = meta.kubecfg_package_metadata().unwrap();
+        println!("{:?}", package);
+
         cli.extend(
             [
                 "docker",

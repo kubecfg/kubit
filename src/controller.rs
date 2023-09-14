@@ -507,12 +507,15 @@ async fn create_job(
                         Container {
                             name: "render-manifests".to_string(),
                             image: Some(kubecfg_image.clone()),
-                            command: Some(render::emit_commandline(
-                                app_instance,
-                                "/overlay/appinstance.json",
-                                Some("/manifests"),
-                                false,
-                            )),
+                            command: Some(
+                                render::emit_commandline(
+                                    app_instance,
+                                    "/overlay/appinstance.json",
+                                    Some("/manifests"),
+                                    false,
+                                )
+                                .await,
+                            ),
                             ..container_defaults.clone()
                         },
                     ]),

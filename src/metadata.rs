@@ -37,7 +37,7 @@ pub async fn run(schema: &Metadata) -> Result<()> {
     Ok(())
 }
 
-async fn fetch_package_config(app_instance: &str) -> Result<PackageConfig> {
+pub async fn fetch_package_config(app_instance: &str) -> Result<PackageConfig> {
     let file = File::open(app_instance)?;
     let app_instance: AppInstance = serde_yaml::from_reader(file)?;
     let reference: Reference = app_instance.spec.package.image.parse()?;
