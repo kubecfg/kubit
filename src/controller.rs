@@ -491,7 +491,7 @@ async fn create_job(
                 spec: Some(PodSpec {
                     service_account: Some(APPLIER_SERVICE_ACCOUNT.to_string()),
                     restart_policy: Some("Never".to_string()),
-                    active_deadline_seconds: Some(60),
+                    active_deadline_seconds: Some(180),
                     volumes: Some(volumes),
                     init_containers: Some(vec![
                         Container {
