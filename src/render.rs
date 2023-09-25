@@ -1,4 +1,4 @@
-use crate::{resources::AppInstance, scripting::Script, Error, Result, metadata};
+use crate::{metadata, resources::AppInstance, scripting::Script, Error, Result};
 use home::home_dir;
 use std::env;
 
@@ -16,7 +16,8 @@ where
         &path.to_string_lossy(),
         Some("/tmp/manifests"),
         is_local,
-    ).await?;
+    )
+    .await?;
     writeln!(w, "{script}")?;
     Ok(())
 }
@@ -56,8 +57,8 @@ pub async fn emit_commandline(
         env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
 
     if is_local {
-
-        let app_instance = serde_yaml::to_string(&app_instance).expect("unable to serialize app_instance");
+        let app_instance =
+            serde_yaml::to_string(&app_instance).expect("unable to serialize app_instance");
         let meta = metadata::fetch_package_config(&app_instance).await.unwrap();
         let package = meta.kubecfg_package_metadata().unwrap();
         println!("{:?}", package);
