@@ -9,7 +9,7 @@ use std::{
 use clap::{Parser, Subcommand};
 use kube::CustomResourceExt;
 
-use kubit::{apply, controller, helpers, local, metadata, render, resources::AppInstance};
+use kubit::{apply, controller, helpers, local, metadata, render, resources::AppInstance, KUBECFG_REGISTRY};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
         #[clap(
             long,
             env = "KUBIT_KUBECFG_IMAGE",
-            default_value = "ghcr.io/kubecfg/kubecfg/kubecfg"
+            default_value = KUBECFG_REGISTRY
         )]
         kubecfg_image: String,
 

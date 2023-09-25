@@ -47,6 +47,9 @@ pub enum Error {
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
+/// GitHub Registry which contains the `kubecfg` image.
+pub const KUBECFG_REGISTRY: &str = "ghcr.io/kubecfg/kubecfg/kubecfg";
+
 /// Expose all controller components used by main.
 pub mod controller;
 
