@@ -1,5 +1,6 @@
-use crate::{metadata, resources::AppInstance, scripting::Script, Error, Result};
+use crate::{metadata, resources::AppInstance, scripting::Script, Error, Result, KUBECFG_REGISTRY};
 use home::home_dir;
+use tempfile::NamedTempFile;
 use std::env;
 
 /// Generates shell script that will render the manifest and writes it to writer.
@@ -57,11 +58,11 @@ pub async fn emit_commandline(
         env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
 
     if is_local {
-        let app_instance =
-            serde_yaml::to_string(&app_instance).expect("unable to serialize app_instance");
-        let meta = metadata::fetch_package_config(&app_instance).await.unwrap();
-        let package = meta.kubecfg_package_metadata().unwrap();
-        println!("{:?}", package);
+        let temp_file = NamedTempFile::new().expect("unable to create temporary file");
+        serde_yaml::to_writer(&temp_file, app_instance).unwrap();
+
+        let meta = metadata::fetch_package_config(temp_file.path().to_str().unwrap()).await.unwrap();
+        let kubecfg_image = meta.versioned_kubecfg_image(KUBECFG_REGISTRY).expect("unable to parse kubecfg image");
 
         cli.extend(
             [
@@ -83,8 +84,7 @@ pub async fn emit_commandline(
                 "DOCKER_CONFIG=/.docker",
                 "--env",
                 "KUBECONFIG=/.kube/config",
-                // TODO: don't hardcode it, take from package metadata
-                "ghcr.io/kubecfg/kubecfg/kubecfg:v0.33.0",
+                &kubecfg_image
             ]
             .iter()
             .map(|s| s.to_string())
