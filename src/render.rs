@@ -4,7 +4,7 @@ use std::env;
 use tempfile::NamedTempFile;
 
 /// GitHub Registry which contains the `kubecfg` image.
-pub const KUBECFG_REGISTRY: &str = "ghcr.io/kubecfg/kubecfg/kubecfg";
+pub const KUBECFG_IMAGE: &str = "ghcr.io/kubecfg/kubecfg/kubecfg";
 
 /// Generates shell script that will render the manifest and writes it to writer.
 pub async fn emit_script<W>(app_instance: &AppInstance, is_local: bool, w: &mut W) -> Result<()>
@@ -68,7 +68,7 @@ pub async fn emit_commandline(
             .await
             .unwrap();
         let kubecfg_image = meta
-            .versioned_kubecfg_image(KUBECFG_REGISTRY)
+            .versioned_kubecfg_image(KUBECFG_IMAGE)
             .expect("unable to parse kubecfg image");
 
         cli.extend(
