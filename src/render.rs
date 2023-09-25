@@ -3,7 +3,7 @@ use home::home_dir;
 use std::env;
 
 /// Generates shell script that will render the manifest and writes it to writer.
-pub fn emit_script<W>(app_instance: &AppInstance, is_local: bool, w: &mut W) -> Result<()>
+pub async fn emit_script<W>(app_instance: &AppInstance, is_local: bool, w: &mut W) -> Result<()>
 where
     W: std::io::Write,
 {
@@ -16,7 +16,7 @@ where
         &path.to_string_lossy(),
         Some("/tmp/manifests"),
         is_local,
-    )?;
+    ).await?;
     writeln!(w, "{script}")?;
     Ok(())
 }
