@@ -1,7 +1,10 @@
-use crate::{metadata, resources::AppInstance, scripting::Script, Error, Result, KUBECFG_REGISTRY};
+use crate::{metadata, resources::AppInstance, scripting::Script, Error, Result};
 use home::home_dir;
 use std::env;
 use tempfile::NamedTempFile;
+
+/// GitHub Registry which contains the `kubecfg` image.
+pub const KUBECFG_REGISTRY: &str = "ghcr.io/kubecfg/kubecfg/kubecfg";
 
 /// Generates shell script that will render the manifest and writes it to writer.
 pub async fn emit_script<W>(app_instance: &AppInstance, is_local: bool, w: &mut W) -> Result<()>
