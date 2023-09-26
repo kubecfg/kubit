@@ -22,12 +22,12 @@ pub enum Metadata {
 pub async fn run(schema: &Metadata) -> Result<()> {
     match schema {
         Metadata::Schema { app_instance } => {
-            let config = fetch_package_config(app_instance).await?;
+            let config = fetch_package_config_from_file(app_instance).await?;
             let schema = config.schema()?;
             println!("{schema}");
         }
         Metadata::Images { app_instance } => {
-            let config = fetch_package_config(app_instance).await?;
+            let config = fetch_package_config_from_file(app_instance).await?;
             let images = config.images();
             for image in images? {
                 println!("{image}");
@@ -37,9 +37,13 @@ pub async fn run(schema: &Metadata) -> Result<()> {
     Ok(())
 }
 
-pub async fn fetch_package_config(app_instance: &str) -> Result<PackageConfig> {
+async fn fetch_package_config_from_file(app_instance: &str) -> Result<PackageConfig> {
     let file = File::open(app_instance)?;
     let app_instance: AppInstance = serde_yaml::from_reader(file)?;
+    fetch_package_config_local_auth(&app_instance).await
+}
+
+pub async fn fetch_package_config_local_auth(app_instance: &AppInstance) -> Result<PackageConfig> {
     let reference: Reference = app_instance.spec.package.image.parse()?;
     let credentials = docker_credential::get_credential(reference.registry())?;
     let DockerCredential::UsernamePassword(username, password) = credentials else {
@@ -47,6 +51,6 @@ pub async fn fetch_package_config(app_instance: &str) -> Result<PackageConfig> {
     };
     let auth = RegistryAuth::Basic(username, password);
 
-    let config = oci::fetch_package_config(&app_instance, &auth).await?;
+    let config = oci::fetch_package_config(app_instance, &auth).await?;
     Ok(config)
 }
