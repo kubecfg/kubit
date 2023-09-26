@@ -1,7 +1,6 @@
 use crate::{metadata, resources::AppInstance, scripting::Script, Error, Result};
 use home::home_dir;
 use std::env;
-use tempfile::NamedTempFile;
 
 /// GitHub Registry which contains the `kubecfg` image.
 pub const KUBECFG_IMAGE: &str = "ghcr.io/kubecfg/kubecfg/kubecfg";
