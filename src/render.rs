@@ -61,13 +61,10 @@ pub async fn emit_commandline(
         env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
 
     if is_local {
-        let temp_file = NamedTempFile::new().expect("unable to create temporary file");
-        serde_yaml::to_writer(&temp_file, app_instance).unwrap();
-
-        let meta = metadata::fetch_package_config(&temp_file.path().to_string_lossy())
+        let package_config = metadata::fetch_package_config_local_auth(app_instance)
             .await
             .unwrap();
-        let kubecfg_image = meta
+        let kubecfg_image = package_config
             .versioned_kubecfg_image(KUBECFG_IMAGE)
             .expect("unable to parse kubecfg image");
 
