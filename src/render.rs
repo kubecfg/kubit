@@ -51,15 +51,15 @@ pub async fn emit_commandline(
     };
 
     let mut cli: Vec<String> = vec![];
-    let overlay_path = std::fs::canonicalize(overlay_file).unwrap();
-    let overlay_file_name = std::path::PathBuf::from(overlay_path.file_name().unwrap());
-    let user_home = home_dir().expect("unable to retrieve home directory");
-    let docker_config =
-        env::var("DOCKER_CONFIG").unwrap_or(format!("{}/.docker", user_home.display()));
-    let kube_config =
-        env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
 
     if is_local {
+        let overlay_path = std::fs::canonicalize(overlay_file).unwrap();
+        let overlay_file_name = std::path::PathBuf::from(overlay_path.file_name().unwrap());
+        let user_home = home_dir().expect("unable to retrieve home directory");
+        let docker_config =
+            env::var("DOCKER_CONFIG").unwrap_or(format!("{}/.docker", user_home.display()));
+        let kube_config =
+            env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
         let package_config = metadata::fetch_package_config_local_auth(app_instance)
             .await
             .unwrap();
@@ -110,6 +110,8 @@ pub async fn emit_commandline(
     // Running as `kubit local apply` requires a different overlay path,
     // as the file is mounted to the container.
     if is_local {
+        let overlay_path = std::fs::canonicalize(overlay_file).unwrap();
+        let overlay_file_name = std::path::PathBuf::from(overlay_path.file_name().unwrap());
         cli.extend(
             [
                 "--overlay-code-file",
@@ -123,7 +125,7 @@ pub async fn emit_commandline(
         cli.extend(
             [
                 "--overlay-code-file",
-                &format!("appInstance_={}", overlay_path.display()),
+                &format!("appInstance_={}", overlay_file),
             ]
             .iter()
             .map(|s| s.to_string())
