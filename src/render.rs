@@ -1,7 +1,12 @@
-use crate::{resources::AppInstance, scripting::Script, Error, Result};
+use crate::{metadata, resources::AppInstance, scripting::Script, Error, Result};
+use home::home_dir;
+use std::env;
+
+/// GitHub Registry which contains the `kubecfg` image.
+pub const KUBECFG_IMAGE: &str = "ghcr.io/kubecfg/kubecfg/kubecfg";
 
 /// Generates shell script that will render the manifest and writes it to writer.
-pub fn emit_script<W>(app_instance: &AppInstance, w: &mut W) -> Result<()>
+pub async fn emit_script<W>(app_instance: &AppInstance, is_local: bool, w: &mut W) -> Result<()>
 where
     W: std::io::Write,
 {
@@ -13,25 +18,29 @@ where
         app_instance,
         &path.to_string_lossy(),
         Some("/tmp/manifests"),
-    )?;
+        is_local,
+    )
+    .await?;
     writeln!(w, "{script}")?;
     Ok(())
 }
 
 /// Generates shell script that will render the manifest
-pub fn script(
+pub async fn script(
     app_instance: &AppInstance,
     overlay_file_name: &str,
     output_dir: Option<&str>,
+    is_local: bool,
 ) -> Result<Script> {
-    let tokens = emit_commandline(app_instance, overlay_file_name, output_dir);
+    let tokens = emit_commandline(app_instance, overlay_file_name, output_dir, is_local).await;
     Ok(Script::from_vec(tokens))
 }
 
-pub fn emit_commandline(
+pub async fn emit_commandline(
     app_instance: &AppInstance,
     overlay_file: &str,
     output_dir: Option<&str>,
+    is_local: bool,
 ) -> Vec<String> {
     let image = &app_instance.spec.package.image;
 
@@ -41,18 +50,88 @@ pub fn emit_commandline(
         format!("oci://{image}")
     };
 
-    let mut cli = [
-        "kubecfg",
-        "show",
-        "--alpha",
-        "--reorder=server",
-        &entrypoint,
-        "--overlay-code-file",
-        &format!("appInstance_={overlay_file}"),
-    ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect::<Vec<String>>();
+    let mut cli: Vec<String> = vec![];
+
+    if is_local {
+        let overlay_path = std::fs::canonicalize(overlay_file).unwrap();
+        let overlay_file_name = std::path::PathBuf::from(overlay_path.file_name().unwrap());
+        let user_home = home_dir().expect("unable to retrieve home directory");
+        let docker_config =
+            env::var("DOCKER_CONFIG").unwrap_or(format!("{}/.docker", user_home.display()));
+        let kube_config =
+            env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
+        let package_config = metadata::fetch_package_config_local_auth(app_instance)
+            .await
+            .unwrap();
+        let kubecfg_image = package_config
+            .versioned_kubecfg_image(KUBECFG_IMAGE)
+            .expect("unable to parse kubecfg image");
+
+        cli.extend(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "-v",
+                &format!("{}:/.kube/config", kube_config),
+                "-v",
+                &format!(
+                    "{}:/overlay/{}",
+                    overlay_path.display(),
+                    overlay_file_name.display()
+                ),
+                "-v",
+                &format!("{}:/.docker", docker_config),
+                // DOCKER_CONFIG within the container
+                "--env",
+                "DOCKER_CONFIG=/.docker",
+                "--env",
+                "KUBECONFIG=/.kube/config",
+                &kubecfg_image,
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>(),
+        );
+    } else {
+        cli = ["kubecfg"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>();
+    }
+
+    cli.extend(
+        ["show", &entrypoint, "--alpha", "--reorder=server"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>(),
+    );
+
+    // Running as `kubit local apply` requires a different overlay path,
+    // as the file is mounted to the container.
+    if is_local {
+        let overlay_path = std::fs::canonicalize(overlay_file).unwrap();
+        let overlay_file_name = std::path::PathBuf::from(overlay_path.file_name().unwrap());
+        cli.extend(
+            [
+                "--overlay-code-file",
+                &format!("appInstance_=/overlay/{}", overlay_file_name.display()),
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>(),
+        );
+    } else {
+        cli.extend(
+            [
+                "--overlay-code-file",
+                &format!("appInstance_={}", overlay_file),
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>(),
+        );
+    }
 
     if let Some(output_dir) = output_dir {
         const FORMAT: &str = "{{printf \"%03d\" (resourceIndex .)}}-{{.apiVersion}}.{{.kind}}-{{default \"default\" .metadata.namespace}}.{{.metadata.name}}";

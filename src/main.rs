@@ -33,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
         #[clap(
             long,
             env = "KUBIT_KUBECFG_IMAGE",
-            default_value = "ghcr.io/kubecfg/kubecfg/kubecfg"
+            default_value = render::KUBECFG_IMAGE
         )]
         kubecfg_image: String,
 
@@ -133,7 +133,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Some(Commands::Metadata { metadata }) => metadata::run(metadata).await?,
-        Some(Commands::Local { local }) => local::run(local, &client.impersonate_user)?,
+        Some(Commands::Local { local }) => local::run(local, &client.impersonate_user).await?,
         Some(Commands::Helper { helper }) => helpers::run(helper).await?,
         Some(Commands::Scripts {
             app_instance,
@@ -143,8 +143,8 @@ async fn main() -> anyhow::Result<()> {
             let app_instance: AppInstance = serde_yaml::from_reader(file)?;
             let mut output = stdout().lock();
             match script {
-                Scripts::Render => render::emit_script(&app_instance, &mut output)?,
-                Scripts::Apply => apply::emit_script(&app_instance, &mut output)?,
+                Scripts::Render => render::emit_script(&app_instance, false, &mut output).await?,
+                Scripts::Apply => apply::emit_script(&app_instance, false, &mut output)?,
             }
         }
         None => {

@@ -2,6 +2,7 @@ use anyhow::{bail, Result};
 use clap::Subcommand;
 use kube::ResourceExt;
 use std::fs::{self, File};
+use std::io;
 use std::io::{stdout, IsTerminal, Read, Write};
 use std::os::unix::prelude::PermissionsExt;
 use std::path::PathBuf;
@@ -43,7 +44,7 @@ pub enum DryRun {
     Script,
 }
 
-pub fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()> {
+pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()> {
     match local {
         Local::Apply {
             app_instance,
@@ -57,7 +58,9 @@ pub fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()> {
                 package_image,
                 impersonate_user,
                 *pre_diff,
-            )?;
+                true,
+            )
+            .await?;
         }
     };
     Ok(())
@@ -112,20 +115,15 @@ impl<W: Write> WriteClose for NopDeferredDelete<W> {}
 impl WriteClose for NamedTempFile {}
 
 /// Generate a script that runs kubecfg show and kubectl apply and runs it.
-pub fn apply(
+pub async fn apply(
     app_instance: &str,
     dry_run: &Option<DryRun>,
     package_image: &Option<String>,
     impersonate_user: &Option<String>,
     pre_diff: bool,
+    is_local: bool,
 ) -> Result<()> {
-    let (mut output, path): (Box<dyn WriteClose>, _) = if matches!(dry_run, Some(DryRun::Script)) {
-        (Box::new(NopDeferredDelete(stdout())), None)
-    } else {
-        let tmp = tempfile::Builder::new().suffix(".sh").tempfile()?;
-        let path = tmp.path().to_path_buf();
-        (Box::new(tmp), Some(path))
-    };
+    let (output, path) = get_script(dry_run)?;
 
     let overlay_file_name = app_instance;
     let file = File::open(overlay_file_name)?;
@@ -139,40 +137,29 @@ pub fn apply(
         if dry_run.is_some() {
             bail!("--diff and --dry-run are mutually exclusive");
         }
-        apply(
+        prediff(
             overlay_file_name,
-            &Some(DryRun::Diff),
+            dry_run,
             package_image,
             impersonate_user,
-            false,
-        )?;
+            true,
+        )
+        .await?;
         if !confirm_continue() {
             return Ok(());
         }
     }
 
-    let steps = vec![
-        Script::from_str("export KUBECTL_APPLYSET=true"),
-        render::script(&app_instance, overlay_file_name, None)?
-            | match dry_run {
-                Some(DryRun::Render) => Script::from_str("cat"),
-                Some(DryRun::Diff) => diff(&app_instance)?,
-                Some(DryRun::Script) | None => apply::script(&app_instance, "-", impersonate_user)?,
-            },
-    ];
-    let script: Script = steps.into_iter().sum();
-
-    writeln!(output, "{script}")?;
-
-    // close the file but don't delete it until _deferred_delete_handle local var is in scope.
-    let _deferred_delete_handle = output.close()?;
-
-    if let Some(path) = path {
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o755))?;
-        Command::new(path).status()?;
-    }
-
-    Ok(())
+    write_script(
+        app_instance,
+        overlay_file_name,
+        output,
+        dry_run,
+        impersonate_user,
+        is_local,
+        path,
+    )
+    .await
 }
 
 fn diff(app_instance: &AppInstance) -> Result<Script> {
@@ -189,7 +176,7 @@ fn diff(app_instance: &AppInstance) -> Result<Script> {
 // Workaround for issue: https://github.com/kubernetes/kubectl/issues/1265
 fn apply_label_workaround() -> Script {
     Script::from_str(
-        r#"apply_label() {  
+        r#"apply_label() {
         kubectl label --local -f - -o json "$1" \
         | jq -c . \
         | while read -r line; do echo '---'; echo "$line" | yq eval -P; done
@@ -210,6 +197,84 @@ fn get_applyset_id(app_instance: &AppInstance) -> Result<String> {
         .output()?
         .stdout;
     Ok(String::from_utf8(out)?)
+}
+
+fn get_script(dry_run: &Option<DryRun>) -> io::Result<(Box<dyn WriteClose>, Option<PathBuf>)> {
+    Ok(if matches!(dry_run, Some(DryRun::Script)) {
+        (Box::new(NopDeferredDelete(stdout())), None)
+    } else {
+        let tmp = tempfile::Builder::new().suffix(".sh").tempfile()?;
+        let path = tmp.path().to_path_buf();
+        (Box::new(tmp), Some(path))
+    })
+}
+
+async fn write_script(
+    app_instance: AppInstance,
+    overlay_file_name: &str,
+    mut output: Box<dyn WriteClose>,
+    dry_run: &Option<DryRun>,
+    impersonate_user: &Option<String>,
+    is_local: bool,
+    path: Option<PathBuf>,
+) -> Result<()> {
+    let mut steps: Vec<Script> = vec![];
+
+    if !is_local {
+        steps.extend([Script::from_str("export KUBECTL_APPLYSET=true")]);
+    }
+
+    steps.extend([
+        render::script(&app_instance, overlay_file_name, None, is_local).await?
+            | match dry_run {
+                Some(DryRun::Render) => Script::from_str("cat"),
+                Some(DryRun::Diff) => diff(&app_instance)?,
+                Some(DryRun::Script) | None => {
+                    apply::script(&app_instance, "-", impersonate_user, is_local)?
+                }
+            },
+    ]);
+
+    let script: Script = steps.into_iter().sum();
+
+    writeln!(output, "{script}")?;
+
+    // close the file but don't delete it until _deferred_delete_handle local var is in scope.
+    let _deferred_delete_handle = output.close()?;
+
+    if let Some(path) = path {
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755))?;
+        Command::new(path).status()?;
+    }
+    Ok(())
+}
+
+async fn prediff(
+    overlay_file_name: &str,
+    dry_run: &Option<DryRun>,
+    package_image: &Option<String>,
+    impersonate_user: &Option<String>,
+    is_local: bool,
+) -> Result<()> {
+    let (output, path) = get_script(dry_run)?;
+
+    let file = File::open(overlay_file_name)?;
+    let mut app_instance: AppInstance = serde_yaml::from_reader(file)?;
+
+    if let Some(package_image) = package_image {
+        app_instance.spec.package.image = package_image.clone();
+    }
+
+    write_script(
+        app_instance,
+        overlay_file_name,
+        output,
+        dry_run,
+        impersonate_user,
+        is_local,
+        path,
+    )
+    .await
 }
 
 pub fn confirm_continue() -> bool {

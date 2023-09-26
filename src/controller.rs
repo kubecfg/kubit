@@ -507,18 +507,27 @@ async fn create_job(
                         Container {
                             name: "render-manifests".to_string(),
                             image: Some(kubecfg_image.clone()),
-                            command: Some(render::emit_commandline(
-                                app_instance,
-                                "/overlay/appinstance.json",
-                                Some("/manifests"),
-                            )),
+                            command: Some(
+                                render::emit_commandline(
+                                    app_instance,
+                                    "/overlay/appinstance.json",
+                                    Some("/manifests"),
+                                    false,
+                                )
+                                .await,
+                            ),
                             ..container_defaults.clone()
                         },
                     ]),
                     containers: vec![Container {
                         name: "apply-manifests".to_string(),
                         image: Some(KUBECTL_IMAGE.to_string()),
-                        command: Some(apply::emit_commandline(app_instance, "/manifests", &None)),
+                        command: Some(apply::emit_commandline(
+                            app_instance,
+                            "/manifests",
+                            &None,
+                            false,
+                        )),
                         ..container_defaults.clone()
                     }],
                     ..Default::default()
