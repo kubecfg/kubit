@@ -31,8 +31,8 @@ pub enum Local {
         #[clap(long("diff"), default_value = "false")]
         pre_diff: bool,
 
-        /// Show diff before applying. If in tty, interactively ask if you want to continue.
-        #[clap(long("skip-auth"), default_value = "false")]
+        /// Allow anonymous authentication to an OCI registry, e.g. to public registries.
+        #[clap(long, default_value = "false")]
         skip_auth: bool,
 
         /// Override the package image field in the spec
