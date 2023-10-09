@@ -218,6 +218,7 @@ fn get_script(dry_run: &Option<DryRun>) -> io::Result<(Box<dyn WriteClose>, Opti
     })
 }
 
+// TODO(jdockerty): refactor args to avoid a huge number of inputs.
 #[allow(clippy::too_many_arguments)]
 async fn write_script(
     app_instance: AppInstance,
