@@ -183,11 +183,11 @@ pub fn emit_fetch_app_instance_commandline(ns: &str, name: &str, output_file: &s
 #[cfg(test)]
 mod tests {
 
+    use super::*;
     use serde_json::json;
     use std::fs::File;
     use tempdir::TempDir;
 
-    use super::*;
     const TEST_PACKAGE_FILE: &str = "testdata/fake-package.yml";
     const TEST_HOME_ENV: &str = "/fake/home/test";
 
