@@ -1,0 +1,14 @@
+apiVersion: kubecfg.dev/v1alpha1
+kind: AppInstance
+metadata:
+  name: test
+  namespace: test
+spec:
+  package:
+    image: gcr.io/mkm-cloud/package-demo:v1
+    apiVersion: influxdata.com/v1alpha1
+    spec:
+      foo: 'bar'
+      baz: 'qux'
+  imagePullSecrets:
+    - name: gar-docker-secret
