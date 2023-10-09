@@ -218,6 +218,7 @@ fn get_script(dry_run: &Option<DryRun>) -> io::Result<(Box<dyn WriteClose>, Opti
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn write_script(
     app_instance: AppInstance,
     overlay_file_name: &str,
