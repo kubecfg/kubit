@@ -117,18 +117,8 @@ mod tests {
         app_instance
     }
 
-    fn setup_test_env_home_dir(reset: bool) {
-        if reset {
-            env::remove_var("HOME");
-            env::remove_var("KUBECONFIG");
-        } else {
-            env::set_var("HOME", TEST_HOME_ENV);
-            env::set_var("KUBECONFIG", format!("{}/.kube/config", TEST_HOME_ENV));
-        }
-    }
-
     #[test]
-    fn emit_commandline_is_correct_when_not_ran_locally() {
+    fn apply_step_emit_commandline_is_correct_when_not_ran_locally() {
         let app_instance = arrange_app_instance();
         let is_local = false;
         let fake_manifest_dir = "/tmp/test";
@@ -156,14 +146,15 @@ mod tests {
     }
 
     #[test]
-    fn emit_commandline_is_correct_when_ran_locally() {
+    fn apply_step_emit_commandline_is_correct_when_ran_locally() {
         let app_instance = arrange_app_instance();
         let is_local = true;
         let stdin_as_arg = "-";
 
-        // Setup environment variables as a "local run" relies on these, they
-        // need to be controlled for our test.
-        setup_test_env_home_dir(false);
+        // Setup environment variables for current process as a "local run" relies on these.
+        // They need to be controlled for our test.
+        env::set_var("HOME", TEST_HOME_ENV);
+        env::set_var("KUBECONFIG", format!("{}/.kube/config", TEST_HOME_ENV));
 
         let host_to_container_kubeconfig_path =
             &format!("{}/.kube/config:/.kube/config", TEST_HOME_ENV);
@@ -198,7 +189,6 @@ mod tests {
         ];
 
         let output = emit_commandline(&app_instance, stdin_as_arg, &None, is_local);
-        setup_test_env_home_dir(true);
 
         assert_eq!(output, expected);
     }
