@@ -193,11 +193,9 @@ mod tests {
 
     fn arrange_app_instance() -> AppInstance {
         let example_file = std::fs::File::open(TEST_PACKAGE_FILE)
-            .expect(&format!("unable to open {}", TEST_PACKAGE_FILE));
-        let app_instance: AppInstance = serde_yaml::from_reader(example_file).expect(&format!(
-            "unable to serialize {} to AppInstance",
-            TEST_PACKAGE_FILE
-        ));
+            .unwrap_or_else(|_| panic!("unable to open {}", TEST_PACKAGE_FILE));
+        let app_instance: AppInstance = serde_yaml::from_reader(example_file).unwrap_or_else(|_| panic!("unable to serialize {} to AppInstance",
+            TEST_PACKAGE_FILE));
         app_instance
     }
 

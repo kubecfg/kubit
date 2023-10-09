@@ -80,13 +80,13 @@ mod tests {
                 .map(|x| x.to_string())
                 .collect(),
         );
-        let expected = r#"#!/bin/bash
+        let expected = r"#!/bin/bash
 set -euo pipefail
 
 echo \
     foo \
     bar \
-    'baz qux'"#;
+    'baz qux'";
         assert_eq!(format!("{script}"), expected);
     }
 
@@ -106,14 +106,14 @@ echo \
         );
         let combined = script_a + script_b;
 
-        let expected = r#"#!/bin/bash
+        let expected = r"#!/bin/bash
 set -euo pipefail
 
 echo \
     foo \
     bar
 echo \
-    'baz qux'"#;
+    'baz qux'";
         assert_eq!(format!("{combined}"), expected);
     }
 
@@ -136,14 +136,14 @@ echo \
 
         let combined: Script = scripts.into_iter().sum();
 
-        let expected = r#"#!/bin/bash
+        let expected = r"#!/bin/bash
 set -euo pipefail
 
 echo \
     foo \
     bar
 echo \
-    'baz qux'"#;
+    'baz qux'";
         assert_eq!(format!("{combined}"), expected);
     }
 
@@ -170,13 +170,13 @@ echo \
         let right = Script::from_vec(["wc", "-c"].into_iter().map(|x| x.to_string()).collect());
 
         let script = left | right;
-        let expected = r#"#!/bin/bash
+        let expected = r"#!/bin/bash
 set -euo pipefail
 
 echo \
     foo \
 | wc \
-    -c"#;
+    -c";
         assert_eq!(format!("{script}"), expected);
     }
 }
