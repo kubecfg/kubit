@@ -6,7 +6,12 @@ use std::env;
 pub const KUBECFG_IMAGE: &str = "ghcr.io/kubecfg/kubecfg/kubecfg";
 
 /// Generates shell script that will render the manifest and writes it to writer.
-pub async fn emit_script<W>(app_instance: &AppInstance, is_local: bool, w: &mut W) -> Result<()>
+pub async fn emit_script<W>(
+    app_instance: &AppInstance,
+    is_local: bool,
+    skip_auth: bool,
+    w: &mut W,
+) -> Result<()>
 where
     W: std::io::Write,
 {
@@ -19,6 +24,7 @@ where
         &path.to_string_lossy(),
         Some("/tmp/manifests"),
         is_local,
+        skip_auth,
     )
     .await?;
     writeln!(w, "{script}")?;
@@ -31,8 +37,16 @@ pub async fn script(
     overlay_file_name: &str,
     output_dir: Option<&str>,
     is_local: bool,
+    skip_auth: bool,
 ) -> Result<Script> {
-    let tokens = emit_commandline(app_instance, overlay_file_name, output_dir, is_local).await;
+    let tokens = emit_commandline(
+        app_instance,
+        overlay_file_name,
+        output_dir,
+        is_local,
+        skip_auth,
+    )
+    .await;
     Ok(Script::from_vec(tokens))
 }
 
@@ -41,6 +55,7 @@ pub async fn emit_commandline(
     overlay_file: &str,
     output_dir: Option<&str>,
     is_local: bool,
+    skip_auth: bool,
 ) -> Vec<String> {
     let image = &app_instance.spec.package.image;
 
@@ -60,7 +75,7 @@ pub async fn emit_commandline(
             env::var("DOCKER_CONFIG").unwrap_or(format!("{}/.docker", user_home.display()));
         let kube_config =
             env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
-        let package_config = metadata::fetch_package_config_local_auth(app_instance)
+        let package_config = metadata::fetch_package_config_local_auth(app_instance, skip_auth)
             .await
             .unwrap();
         let kubecfg_image = package_config

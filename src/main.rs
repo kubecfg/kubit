@@ -70,6 +70,9 @@ async fn main() -> anyhow::Result<()> {
             #[clap(long)]
             app_instance: String,
 
+            #[clap(long)]
+            skip_auth: bool,
+
             #[command(subcommand)]
             script: Scripts,
         },
@@ -138,12 +141,15 @@ async fn main() -> anyhow::Result<()> {
         Some(Commands::Scripts {
             app_instance,
             script,
+            skip_auth,
         }) => {
             let file = File::open(app_instance)?;
             let app_instance: AppInstance = serde_yaml::from_reader(file)?;
             let mut output = stdout().lock();
             match script {
-                Scripts::Render => render::emit_script(&app_instance, false, &mut output).await?,
+                Scripts::Render => {
+                    render::emit_script(&app_instance, false, *skip_auth, &mut output).await?
+                }
                 Scripts::Apply => apply::emit_script(&app_instance, false, &mut output)?,
             }
         }

@@ -116,7 +116,7 @@ pub async fn fetch_package_config(
     };
     let mut client = Client::new(client_config);
     let reference: Reference = image.parse()?;
-    let (manifest, _) = client.pull_manifest(&reference, auth).await?;
+    let (manifest, _) = client.pull_manifest(&reference, &auth).await?;
 
     let manifest = match manifest {
         OciManifest::Image(manifest) => manifest,
