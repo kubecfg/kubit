@@ -149,7 +149,7 @@ mod tests {
         let is_local = true;
         let stdin_as_arg = "-";
 
-        // Setup environment variables for current process as a "local run" relies on these.
+        // Setup environment variables for the current process as a "local apply" relies on them.
         // They need to be controlled for our test.
         env::set_var("HOME", TEST_HOME_ENV);
         env::set_var("KUBECONFIG", format!("{}/.kube/config", TEST_HOME_ENV));

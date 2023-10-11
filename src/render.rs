@@ -257,6 +257,8 @@ mod tests {
         env::set_var("KUBECONFIG", test_kubeconfig_path);
         env::set_var("DOCKER_CONFIG", temp_dir.path());
 
+        // Rendering relies on a specific package version of `kubecfg`, we must
+        // retrieve that version here to ensure that our output is correct.
         let package_config = metadata::fetch_package_config_local_auth(&app_instance, skip_auth)
             .await
             .unwrap();
