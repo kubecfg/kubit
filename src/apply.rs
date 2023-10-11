@@ -104,7 +104,7 @@ mod tests {
     use super::*;
     use serde_yaml;
 
-    const TEST_PACKAGE_FILE: &str = "testdata/fake-package.yml";
+    const TEST_PACKAGE_FILE: &str = "tests/fixtures/fake-package.yml";
     const TEST_HOME_ENV: &str = "/fake/home/test";
 
     fn arrange_app_instance() -> AppInstance {

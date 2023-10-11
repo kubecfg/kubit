@@ -188,7 +188,7 @@ mod tests {
     use std::fs::File;
     use tempdir::TempDir;
 
-    const TEST_PACKAGE_FILE: &str = "testdata/fake-package.yml";
+    const TEST_PACKAGE_FILE: &str = "tests/fixtures/fake-package.yml";
     const TEST_HOME_ENV: &str = "/fake/home/test";
 
     fn arrange_app_instance() -> AppInstance {
