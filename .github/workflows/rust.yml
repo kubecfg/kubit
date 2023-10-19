@@ -54,7 +54,7 @@ jobs:
         if: github.event_name != 'pull_request'
 
       - name: Build
-        uses: depot/build-push-action@39acb3f766a908058e746f5c7a166f73e4cdcb17 # v1
+        uses: depot/build-push-action@fe21fca271114de9237a9b1129b9ef38c77a1c21 # v1
         with:
           project: v8n5whjnsb
           context: .
@@ -66,7 +66,7 @@ jobs:
         run: |
           docker run --rm ghcr.io/kubecfg/kubit:latest --version
       - name: Push
-        uses: depot/build-push-action@39acb3f766a908058e746f5c7a166f73e4cdcb17 # v1
+        uses: depot/build-push-action@fe21fca271114de9237a9b1129b9ef38c77a1c21 # v1
         with:
           project: v8n5whjnsb
           context: .
@@ -114,7 +114,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: release_image
-        uses: depot/build-push-action@39acb3f766a908058e746f5c7a166f73e4cdcb17 # v1
+        uses: depot/build-push-action@fe21fca271114de9237a9b1129b9ef38c77a1c21 # v1
         with:
           project: v8n5whjnsb
           context: .
