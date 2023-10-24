@@ -14,14 +14,14 @@ pub enum Metadata {
     /// Retrieve the JSON schema for the package `spec`.
     Schema {
         app_instance: String,
-        allow_anonymous: bool,
+        skip_auth: bool,
     },
 
     /// Retrieve the list of OCI images referenced by the package.
     /// It can be useful when using private mirror for air-gapped environments.
     Images {
         app_instance: String,
-        allow_anonymous: bool,
+        skip_auth: bool,
     },
 }
 
@@ -29,17 +29,17 @@ pub async fn run(schema: &Metadata) -> Result<()> {
     match schema {
         Metadata::Schema {
             app_instance,
-            allow_anonymous,
+            skip_auth,
         } => {
-            let config = fetch_package_config_from_file(app_instance, *allow_anonymous).await?;
+            let config = fetch_package_config_from_file(app_instance, *skip_auth).await?;
             let schema = config.schema()?;
             println!("{schema}");
         }
         Metadata::Images {
             app_instance,
-            allow_anonymous,
+            skip_auth,
         } => {
-            let config = fetch_package_config_from_file(app_instance, *allow_anonymous).await?;
+            let config = fetch_package_config_from_file(app_instance, *skip_auth).await?;
             let images = config.images();
             for image in images? {
                 println!("{image}");
@@ -51,20 +51,20 @@ pub async fn run(schema: &Metadata) -> Result<()> {
 
 async fn fetch_package_config_from_file(
     app_instance: &str,
-    allow_anonymous: bool,
+    skip_auth: bool,
 ) -> Result<PackageConfig> {
     let file = File::open(app_instance)?;
     let app_instance: AppInstance = serde_yaml::from_reader(file)?;
-    fetch_package_config_local_auth(&app_instance, allow_anonymous).await
+    fetch_package_config_local_auth(&app_instance, skip_auth).await
 }
 
 pub async fn fetch_package_config_local_auth(
     app_instance: &AppInstance,
-    allow_anonymous: bool,
+    skip_auth: bool,
 ) -> Result<PackageConfig> {
     let reference: Reference = app_instance.spec.package.image.parse()?;
 
-    if allow_anonymous {
+    if skip_auth {
         let config = oci::fetch_package_config(app_instance, &RegistryAuth::Anonymous).await?;
         Ok(config)
     } else {
