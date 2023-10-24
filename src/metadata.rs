@@ -63,17 +63,15 @@ pub async fn fetch_package_config_local_auth(
     skip_auth: bool,
 ) -> Result<PackageConfig> {
     let reference: Reference = app_instance.spec.package.image.parse()?;
-
-    if skip_auth {
-        let config = oci::fetch_package_config(app_instance, &RegistryAuth::Anonymous).await?;
-        Ok(config)
+    let auth = if skip_auth {
+        RegistryAuth::Anonymous
     } else {
         let credentials = docker_credential::get_credential(reference.registry())?;
         let DockerCredential::UsernamePassword(username, password) = credentials else {
             bail!("unsupported docker credentials")
         };
-        let auth = RegistryAuth::Basic(username, password);
-        let config = oci::fetch_package_config(app_instance, &auth).await?;
-        Ok(config)
-    }
+        RegistryAuth::Basic(username, password)
+    };
+    let config = oci::fetch_package_config(app_instance, &auth).await?;
+    Ok(config)
 }
