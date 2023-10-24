@@ -1,22 +1,15 @@
 use assert_cmd::prelude::*;
 use kubit::apply::{KUBECTL_APPLYSET_ENABLED, KUBECTL_IMAGE, KUBIT_APPLIER_FIELD_MANAGER};
 use kubit::render::KUBECFG_IMAGE;
-use std::env;
 use std::path::PathBuf;
 use std::process::Command;
 use std::str::from_utf8;
 
-const TEST_HOME_ENV: &str = "/fake/home/test";
 const DEMO_PACKAGE: &str = "oci://gcr.io/mkm-cloud/package-demo:v1";
 const TEST_FILE: &str = "tests/fixtures/fake-package.yml";
 
 #[tokio::test]
 async fn local_apply_dry_run_script() {
-    // Setup environment variables for the current process as a "local apply" relies on them.
-    // They need to be controlled for our test.
-    env::set_var("HOME", TEST_HOME_ENV);
-    env::set_var("KUBECONFIG", format!("{}/.kube/config", TEST_HOME_ENV));
-
     let mut cmd = Command::cargo_bin("kubit").unwrap();
     let output = cmd
         .args([
