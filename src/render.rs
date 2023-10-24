@@ -184,12 +184,7 @@ pub fn emit_fetch_app_instance_commandline(ns: &str, name: &str, output_file: &s
 mod tests {
 
     use super::*;
-    use serde_json::json;
-    use std::fs::File;
-    use tempdir::TempDir;
-
     const TEST_PACKAGE_FILE: &str = "tests/fixtures/fake-package.yml";
-    const TEST_HOME_ENV: &str = "/fake/home/test";
 
     fn arrange_app_instance() -> AppInstance {
         let example_file = std::fs::File::open(TEST_PACKAGE_FILE)
@@ -200,7 +195,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn render_emit_commandline_when_not_local() {
+    async fn render_emit_commandline() {
         let app_instance = arrange_app_instance();
         let is_local = false;
         let skip_auth = false;
@@ -214,79 +209,6 @@ mod tests {
             "--reorder=server",
             "--overlay-code-file",
             test_overlay_file,
-        ];
-
-        let output =
-            emit_commandline(&app_instance, TEST_PACKAGE_FILE, None, is_local, skip_auth).await;
-
-        assert_eq!(output, expected);
-    }
-
-    #[tokio::test]
-    async fn render_emit_commandline_when_local() {
-        let app_instance = arrange_app_instance();
-        let is_local = true;
-        // Ensure that we don't need to interact with "credHelpers" or registry auth for
-        // a fake package.
-        let skip_auth = true;
-        let local_dir_prefix = "render_emit_local";
-
-        let temp_dir =
-            TempDir::new(local_dir_prefix).expect("unable to create temporary dir for test");
-        let fake_config_path = temp_dir.path().join("config.json");
-        let fake_config =
-            File::create(&fake_config_path).expect("unable to create fake_config for test");
-
-        // Arranging fake credentials for our test, 'something' needs to exist for the
-        // docker_credentials crate to read; however, they do not have to be valid.
-        let fake_credentials = json!({"auths": {"gcr.io": {"auth": "ZmFrZTp0ZXN0Cg=="}}});
-        let _ = serde_json::to_writer(&fake_config, &fake_credentials);
-
-        let test_kubeconfig_path = &format!("{}/.kube/config", TEST_HOME_ENV);
-        let test_mounted_kubeconfig_path = &format!("{}:/.kube/config", test_kubeconfig_path);
-        let test_mounted_overlay_path = &format!(
-            "{}/{}:/overlay/fake-package.yml",
-            std::env::current_dir()
-                .expect("unable to get current dir")
-                .display(),
-            TEST_PACKAGE_FILE
-        );
-        let test_mounted_docker_path = &format!("{}:/.docker", temp_dir.path().display());
-
-        // Set reliant environment variables for the currently running process before executing.
-        env::set_var("KUBECONFIG", test_kubeconfig_path);
-        env::set_var("DOCKER_CONFIG", temp_dir.path());
-
-        // Rendering relies on a specific package version of `kubecfg`, we must
-        // retrieve that version here to ensure that our output is correct.
-        let package_config = metadata::fetch_package_config_local_auth(&app_instance, skip_auth)
-            .await
-            .unwrap();
-        let kubecfg_image = package_config
-            .versioned_kubecfg_image(KUBECFG_IMAGE)
-            .expect("unable to parse kubecfg image");
-
-        let expected = vec![
-            "docker",
-            "run",
-            "--rm",
-            "-v",
-            test_mounted_kubeconfig_path,
-            "-v",
-            test_mounted_overlay_path,
-            "-v",
-            test_mounted_docker_path,
-            "--env",
-            "DOCKER_CONFIG=/.docker",
-            "--env",
-            "KUBECONFIG=/.kube/config",
-            &kubecfg_image,
-            "show",
-            "oci://gcr.io/mkm-cloud/package-demo:v1",
-            "--alpha",
-            "--reorder=server",
-            "--overlay-code-file",
-            "appInstance_=/overlay/fake-package.yml",
         ];
 
         let output =

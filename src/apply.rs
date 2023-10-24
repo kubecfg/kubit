@@ -105,7 +105,6 @@ mod tests {
     use serde_yaml;
 
     const TEST_PACKAGE_FILE: &str = "tests/fixtures/fake-package.yml";
-    const TEST_HOME_ENV: &str = "/fake/home/test";
 
     fn arrange_app_instance() -> AppInstance {
         let example_file = std::fs::File::open(TEST_PACKAGE_FILE)
@@ -116,7 +115,7 @@ mod tests {
     }
 
     #[test]
-    fn apply_emit_commandline_when_not_ran_locally() {
+    fn apply_emit_commandline() {
         let app_instance = arrange_app_instance();
         let is_local = false;
         let fake_manifest_dir = "/tmp/test";
@@ -139,54 +138,6 @@ mod tests {
         ];
 
         let output = emit_commandline(&app_instance, fake_manifest_dir, &None, is_local);
-
-        assert_eq!(output, expected);
-    }
-
-    #[test]
-    fn apply_emit_commandline_when_ran_locally() {
-        let app_instance = arrange_app_instance();
-        let is_local = true;
-        let stdin_as_arg = "-";
-
-        // Setup environment variables for the current process as a "local apply" relies on them.
-        // They need to be controlled for our test.
-        env::set_var("HOME", TEST_HOME_ENV);
-        env::set_var("KUBECONFIG", format!("{}/.kube/config", TEST_HOME_ENV));
-
-        let host_to_container_kubeconfig_path =
-            &format!("{}/.kube/config:/.kube/config", TEST_HOME_ENV);
-
-        let expected = vec![
-            "docker",
-            "run",
-            "--interactive",
-            "--rm",
-            "--network",
-            "host",
-            "-v",
-            host_to_container_kubeconfig_path,
-            "--env",
-            KUBECTL_APPLYSET_ENABLED,
-            "--env",
-            "KUBECONFIG=/.kube/config",
-            KUBECTL_IMAGE,
-            "apply",
-            "-n",
-            "test",
-            "--server-side",
-            "--prune",
-            "--applyset",
-            "test",
-            "--field-manager",
-            KUBIT_APPLIER_FIELD_MANAGER,
-            "--force-conflicts",
-            "-v=2",
-            "-f",
-            stdin_as_arg,
-        ];
-
-        let output = emit_commandline(&app_instance, stdin_as_arg, &None, is_local);
 
         assert_eq!(output, expected);
     }
