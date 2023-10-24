@@ -7,9 +7,9 @@ jobs:
   check-actions:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
       - name: Install action-validator with asdf
-        uses: asdf-vm/actions/install@6a442392015fbbdd8b48696d41e0051b2698b2e4 # v2
+        uses: asdf-vm/actions/install@05e0d2ed97b598bfce82fd30daf324ae0c4570e6 # v3
         with:
           tool_versions: |
             action-validator 0.5.3
