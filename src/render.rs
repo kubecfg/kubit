@@ -6,7 +6,12 @@ use std::env;
 pub const KUBECFG_IMAGE: &str = "ghcr.io/kubecfg/kubecfg/kubecfg";
 
 /// Generates shell script that will render the manifest and writes it to writer.
-pub async fn emit_script<W>(app_instance: &AppInstance, is_local: bool, w: &mut W) -> Result<()>
+pub async fn emit_script<W>(
+    app_instance: &AppInstance,
+    is_local: bool,
+    skip_auth: bool,
+    w: &mut W,
+) -> Result<()>
 where
     W: std::io::Write,
 {
@@ -19,6 +24,7 @@ where
         &path.to_string_lossy(),
         Some("/tmp/manifests"),
         is_local,
+        skip_auth,
     )
     .await?;
     writeln!(w, "{script}")?;
@@ -31,8 +37,16 @@ pub async fn script(
     overlay_file_name: &str,
     output_dir: Option<&str>,
     is_local: bool,
+    skip_auth: bool,
 ) -> Result<Script> {
-    let tokens = emit_commandline(app_instance, overlay_file_name, output_dir, is_local).await;
+    let tokens = emit_commandline(
+        app_instance,
+        overlay_file_name,
+        output_dir,
+        is_local,
+        skip_auth,
+    )
+    .await;
     Ok(Script::from_vec(tokens))
 }
 
@@ -41,6 +55,7 @@ pub async fn emit_commandline(
     overlay_file: &str,
     output_dir: Option<&str>,
     is_local: bool,
+    skip_auth: bool,
 ) -> Vec<String> {
     let image = &app_instance.spec.package.image;
 
@@ -60,7 +75,7 @@ pub async fn emit_commandline(
             env::var("DOCKER_CONFIG").unwrap_or(format!("{}/.docker", user_home.display()));
         let kube_config =
             env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
-        let package_config = metadata::fetch_package_config_local_auth(app_instance)
+        let package_config = metadata::fetch_package_config_local_auth(app_instance, skip_auth)
             .await
             .unwrap();
         let kubecfg_image = package_config
@@ -163,4 +178,42 @@ pub fn emit_fetch_app_instance_commandline(ns: &str, name: &str, output_file: &s
     .iter()
     .map(|s| s.to_string())
     .collect::<Vec<_>>()
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    const TEST_PACKAGE_FILE: &str = "tests/fixtures/fake-package.yml";
+
+    fn arrange_app_instance() -> AppInstance {
+        let example_file = std::fs::File::open(TEST_PACKAGE_FILE)
+            .unwrap_or_else(|_| panic!("unable to open {}", TEST_PACKAGE_FILE));
+        let app_instance: AppInstance = serde_yaml::from_reader(example_file)
+            .unwrap_or_else(|_| panic!("unable to serialize {} to AppInstance", TEST_PACKAGE_FILE));
+        app_instance
+    }
+
+    #[tokio::test]
+    async fn render_emit_commandline() {
+        let app_instance = arrange_app_instance();
+        let is_local = false;
+        let skip_auth = false;
+
+        let test_overlay_file = &format!("appInstance_={}", TEST_PACKAGE_FILE);
+        let expected = vec![
+            "kubecfg",
+            "show",
+            "oci://gcr.io/mkm-cloud/package-demo:v1",
+            "--alpha",
+            "--reorder=server",
+            "--overlay-code-file",
+            test_overlay_file,
+        ];
+
+        let output =
+            emit_commandline(&app_instance, TEST_PACKAGE_FILE, None, is_local, skip_auth).await;
+
+        assert_eq!(output, expected);
+    }
 }

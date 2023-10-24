@@ -31,6 +31,10 @@ pub enum Local {
         #[clap(long("diff"), default_value = "false")]
         pre_diff: bool,
 
+        /// Allow anonymous authentication to an OCI registry, e.g. to public registries.
+        #[clap(long, default_value = "false")]
+        skip_auth: bool,
+
         /// Override the package image field in the spec
         #[clap(long)]
         package_image: Option<String>,
@@ -51,6 +55,7 @@ pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()>
             dry_run,
             package_image,
             pre_diff,
+            skip_auth,
         } => {
             apply(
                 app_instance,
@@ -59,6 +64,7 @@ pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()>
                 impersonate_user,
                 *pre_diff,
                 true,
+                *skip_auth,
             )
             .await?;
         }
@@ -122,6 +128,7 @@ pub async fn apply(
     impersonate_user: &Option<String>,
     pre_diff: bool,
     is_local: bool,
+    skip_auth: bool,
 ) -> Result<()> {
     let (output, path) = get_script(dry_run)?;
 
@@ -143,6 +150,7 @@ pub async fn apply(
             package_image,
             impersonate_user,
             true,
+            skip_auth,
         )
         .await?;
         if !confirm_continue() {
@@ -157,6 +165,7 @@ pub async fn apply(
         dry_run,
         impersonate_user,
         is_local,
+        skip_auth,
         path,
     )
     .await
@@ -209,6 +218,8 @@ fn get_script(dry_run: &Option<DryRun>) -> io::Result<(Box<dyn WriteClose>, Opti
     })
 }
 
+// TODO(jdockerty): refactor args to avoid a huge number of inputs.
+#[allow(clippy::too_many_arguments)]
 async fn write_script(
     app_instance: AppInstance,
     overlay_file_name: &str,
@@ -216,6 +227,7 @@ async fn write_script(
     dry_run: &Option<DryRun>,
     impersonate_user: &Option<String>,
     is_local: bool,
+    skip_auth: bool,
     path: Option<PathBuf>,
 ) -> Result<()> {
     let mut steps: Vec<Script> = vec![];
@@ -225,7 +237,7 @@ async fn write_script(
     }
 
     steps.extend([
-        render::script(&app_instance, overlay_file_name, None, is_local).await?
+        render::script(&app_instance, overlay_file_name, None, is_local, skip_auth).await?
             | match dry_run {
                 Some(DryRun::Render) => Script::from_str("cat"),
                 Some(DryRun::Diff) => diff(&app_instance)?,
@@ -255,6 +267,7 @@ async fn prediff(
     package_image: &Option<String>,
     impersonate_user: &Option<String>,
     is_local: bool,
+    skip_auth: bool,
 ) -> Result<()> {
     let (output, path) = get_script(dry_run)?;
 
@@ -272,6 +285,7 @@ async fn prediff(
         dry_run,
         impersonate_user,
         is_local,
+        skip_auth,
         path,
     )
     .await

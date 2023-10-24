@@ -5,7 +5,7 @@ use std::env;
 
 pub const KUBIT_APPLIER_FIELD_MANAGER: &str = "kubit-applier";
 pub const KUBECTL_IMAGE: &str = "bitnami/kubectl:1.27.5";
-const KUBECTL_APPLYSET_ENABLED: &str = "KUBECTL_APPLYSET=true";
+pub const KUBECTL_APPLYSET_ENABLED: &str = "KUBECTL_APPLYSET=true";
 
 /// Generates shell script that will apply the manifests and writes it to w
 pub fn emit_script<W>(app_instance: &AppInstance, is_local: bool, w: &mut W) -> Result<()>
@@ -97,4 +97,48 @@ pub fn emit_commandline(
     }
 
     cli
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_yaml;
+
+    const TEST_PACKAGE_FILE: &str = "tests/fixtures/fake-package.yml";
+
+    fn arrange_app_instance() -> AppInstance {
+        let example_file = std::fs::File::open(TEST_PACKAGE_FILE)
+            .unwrap_or_else(|_| panic!("unable to open {}", TEST_PACKAGE_FILE));
+        let app_instance: AppInstance = serde_yaml::from_reader(example_file)
+            .unwrap_or_else(|_| panic!("unable to serialize {} to AppInstance", TEST_PACKAGE_FILE));
+        app_instance
+    }
+
+    #[test]
+    fn apply_emit_commandline() {
+        let app_instance = arrange_app_instance();
+        let is_local = false;
+        let fake_manifest_dir = "/tmp/test";
+
+        let expected = vec![
+            "kubectl",
+            "apply",
+            "-n",
+            "test",
+            "--server-side",
+            "--prune",
+            "--applyset",
+            "test",
+            "--field-manager",
+            KUBIT_APPLIER_FIELD_MANAGER,
+            "--force-conflicts",
+            "-v=2",
+            "-f",
+            fake_manifest_dir,
+        ];
+
+        let output = emit_commandline(&app_instance, fake_manifest_dir, &None, is_local);
+
+        assert_eq!(output, expected);
+    }
 }

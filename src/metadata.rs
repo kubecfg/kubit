@@ -12,22 +12,34 @@ use crate::{
 #[derive(Clone, Subcommand)]
 pub enum Metadata {
     /// Retrieve the JSON schema for the package `spec`.
-    Schema { app_instance: String },
+    Schema {
+        app_instance: String,
+        skip_auth: bool,
+    },
 
     /// Retrieve the list of OCI images referenced by the package.
     /// It can be useful when using private mirror for air-gapped environments.
-    Images { app_instance: String },
+    Images {
+        app_instance: String,
+        skip_auth: bool,
+    },
 }
 
 pub async fn run(schema: &Metadata) -> Result<()> {
     match schema {
-        Metadata::Schema { app_instance } => {
-            let config = fetch_package_config_from_file(app_instance).await?;
+        Metadata::Schema {
+            app_instance,
+            skip_auth,
+        } => {
+            let config = fetch_package_config_from_file(app_instance, *skip_auth).await?;
             let schema = config.schema()?;
             println!("{schema}");
         }
-        Metadata::Images { app_instance } => {
-            let config = fetch_package_config_from_file(app_instance).await?;
+        Metadata::Images {
+            app_instance,
+            skip_auth,
+        } => {
+            let config = fetch_package_config_from_file(app_instance, *skip_auth).await?;
             let images = config.images();
             for image in images? {
                 println!("{image}");
@@ -37,20 +49,29 @@ pub async fn run(schema: &Metadata) -> Result<()> {
     Ok(())
 }
 
-async fn fetch_package_config_from_file(app_instance: &str) -> Result<PackageConfig> {
+async fn fetch_package_config_from_file(
+    app_instance: &str,
+    skip_auth: bool,
+) -> Result<PackageConfig> {
     let file = File::open(app_instance)?;
     let app_instance: AppInstance = serde_yaml::from_reader(file)?;
-    fetch_package_config_local_auth(&app_instance).await
+    fetch_package_config_local_auth(&app_instance, skip_auth).await
 }
 
-pub async fn fetch_package_config_local_auth(app_instance: &AppInstance) -> Result<PackageConfig> {
+pub async fn fetch_package_config_local_auth(
+    app_instance: &AppInstance,
+    skip_auth: bool,
+) -> Result<PackageConfig> {
     let reference: Reference = app_instance.spec.package.image.parse()?;
-    let credentials = docker_credential::get_credential(reference.registry())?;
-    let DockerCredential::UsernamePassword(username, password) = credentials else {
-        bail!("unsupported docker credentials")
+    let auth = if skip_auth {
+        RegistryAuth::Anonymous
+    } else {
+        let credentials = docker_credential::get_credential(reference.registry())?;
+        let DockerCredential::UsernamePassword(username, password) = credentials else {
+            bail!("unsupported docker credentials")
+        };
+        RegistryAuth::Basic(username, password)
     };
-    let auth = RegistryAuth::Basic(username, password);
-
     let config = oci::fetch_package_config(app_instance, &auth).await?;
     Ok(config)
 }
