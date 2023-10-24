@@ -66,7 +66,7 @@ pub async fn fetch_package_config_local_auth(
 
     if allow_anonymous {
         let config = oci::fetch_package_config(app_instance, &RegistryAuth::Anonymous).await?;
-        return Ok(config);
+        Ok(config)
     } else {
         let credentials = docker_credential::get_credential(reference.registry())?;
         let DockerCredential::UsernamePassword(username, password) = credentials else {
@@ -74,6 +74,6 @@ pub async fn fetch_package_config_local_auth(
         };
         let auth = RegistryAuth::Basic(username, password);
         let config = oci::fetch_package_config(app_instance, &auth).await?;
-        return Ok(config);
+        Ok(config)
     }
 }
