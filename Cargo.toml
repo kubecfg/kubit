@@ -37,3 +37,5 @@ home = { version = "0.5.5", features = [] }
 
 [dev-dependencies]
 tempdir = "0.3.7"
+assert_cmd = "2.0.12"
+predicates = "3.0.4"
