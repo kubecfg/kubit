@@ -63,8 +63,8 @@ pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()>
                 package_image,
                 impersonate_user,
                 *pre_diff,
-                *skip_auth,
                 true,
+                *skip_auth,
             )
             .await?;
         }
