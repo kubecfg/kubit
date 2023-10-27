@@ -2,6 +2,8 @@ name: pack/push package demo
 on:
   push:
     branches: ["main"]
+  pull_request:
+    branches: ["feat/demo-package-for-tests"]
   schedule:
     # Every 6 hours
     - cron: '0 */6 * * *'
