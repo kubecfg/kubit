@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::str::from_utf8;
 
-const DEMO_PACKAGE: &str = "oci://gcr.io/mkm-cloud/package-demo:v1";
+const DEMO_PACKAGE: &str = "oci://ghcr.io/kubecfg/kubit/package-demo:v1";
 const TEST_FILE: &str = "tests/fixtures/fake-package.yml";
 
 #[tokio::test]
