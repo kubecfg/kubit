@@ -24,10 +24,9 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-        # if: github.event_name != 'pull_request'
-      - name: Install kubecfgpack
+      - name: Install kubecfg
         run: go install github.com/kubecfg/kubecfg@latest
-      - name: Version and Pack
-        run: |
-          kubecfg version
-          kubecfg pack --alpha ghcr.io/kubecfg/kubit/package-demo:v1 tests/fixtures/shell.jsonnet
+      - name: Check version
+        run: kubecfg version
+      - name: Run kubecfg pack
+        run: kubecfg pack --alpha ghcr.io/kubecfg/kubit/package-demo:v1 tests/fixtures/shell.jsonnet
