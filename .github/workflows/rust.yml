@@ -45,8 +45,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
         # if: github.event_name != 'pull_request'
-      - run: |
-          go install github.com/kubecfg/kubecfg@latest
+      - name: Install kubecfgpack
+        run: go install github.com/kubecfg/kubecfg@latest
+      - name: Version and Pack
+        run: |
+          kubecfg version
           kubecfg pack --alpha ghcr.io/kubecfg/kubit/package-demo:v1 tests/fixtures/shell.jsonnet
 
   pack:
