@@ -95,18 +95,38 @@ pub async fn emit_commandline(
                     overlay_path.display(),
                     overlay_file_name.display()
                 ),
-                "-v",
-                &format!("{}:/.docker", docker_config),
-                // DOCKER_CONFIG within the container
-                "--env",
-                "DOCKER_CONFIG=/.docker",
                 "--env",
                 "KUBECONFIG=/.kube/config",
-                &kubecfg_image,
             ]
             .iter()
             .map(|s| s.to_string())
             .collect::<Vec<_>>(),
+        );
+
+        // Whenever we are not skipping authentication, we should always mount
+        // docker credentials in order to pull image manifests.
+        if !skip_auth {
+            cli.extend(
+                [
+                    "-v",
+                    &format!("{}:/.docker", docker_config),
+                    // DOCKER_CONFIG within the container
+                    "--env",
+                    "DOCKER_CONFIG=/.docker",
+                ]
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>(),
+            );
+        }
+
+        // The image should always be the final item in the "docker run" section
+        // in order for the proceeding arguments to be parsed correctly.
+        cli.extend(
+            [&kubecfg_image]
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>(),
         );
     } else {
         cli = ["kubecfg"]
