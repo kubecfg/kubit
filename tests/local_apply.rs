@@ -57,31 +57,19 @@ async fn local_apply_dry_run_render() {
             "--dry-run",
             "render",
             "--skip-auth",
-        ]);
-    println!("{output:?}");
+        ])
+        .unwrap()
+        .stdout
+        .to_vec();
 
-    let output = output.unwrap();
-    println!("{output:?}");
+    let output = from_utf8(&output).expect("unable to read output script");
 
-    let vectorised_output = &output.stdout.to_vec();
-    let output = from_utf8(vectorised_output).expect("unable to read output script");
-    let overlay_file = PathBuf::from(
-        std::fs::canonicalize(TEST_FILE)
-            .expect("unable to find realpath for test")
-            .file_name()
-            .unwrap(),
-    );
-
-    println!("{:?}", output);
-
-
-    // Assert some known required items in the output command.
-    //assert!(output.contains("docker"));
-    //assert!(output.contains(DEMO_PACKAGE));
-    //assert!(output.contains(KUBECTL_IMAGE));
-    //assert!(output.contains(KUBECFG_IMAGE));
-    //assert!(output.contains(KUBECTL_APPLYSET_ENABLED));
-    //assert!(output.contains(KUBIT_APPLIER_FIELD_MANAGER));
-    //assert!(output.contains("--server-side"));
-    //assert!(output.contains(&format!("appInstance_=/overlay/{}", overlay_file.display())));
+    // Assert some known required items in the rendered output.
+    assert!(output.contains("apiVersion"));
+    assert!(output.contains("kind"));
+    assert!(output.contains("StatefulSet"));
+    assert!(output.contains("Service"));
+    assert!(output.contains("AppInstance"));
+    assert!(output.contains("kubecfg.dev/v1alpha1"));
+    assert!(output.contains(DEMO_PACKAGE.strip_prefix("oci://").unwrap()));
 }
