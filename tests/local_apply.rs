@@ -58,12 +58,12 @@ async fn local_apply_dry_run_render() {
             "render",
             "--skip-auth",
         ])
-        .unwrap()
-        .stdout
-        .to_vec();
-
-    let output = from_utf8(&output).expect("unable to read output script");
+        .unwrap();
     println!("{output:?}");
+
+    let vec_out = &output.stdout.to_vec();
+
+    let output = from_utf8(vec_out).expect("unable to read output script");
 
     // Assert some known required items in the rendered output.
     assert!(output.contains("gar-docker-secret"));
