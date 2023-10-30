@@ -28,7 +28,7 @@ jobs:
       - name: Diff
         run: test -z "$(git status --porcelain)" || (echo 'Changes detected after generating manifests'; git status; git --no-pager diff; false)
       - name: Run tests
-        run: cargo test
+        run: cargo test -- --nocapture
 
   pack:
     runs-on: ubuntu-latest
