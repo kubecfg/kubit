@@ -224,7 +224,7 @@ mod tests {
         let expected = vec![
             "kubecfg",
             "show",
-            "oci://gcr.io/mkm-cloud/package-demo:v1",
+            "oci://ghcr.io/kubecfg/kubit/package-demo:v1",
             "--alpha",
             "--reorder=server",
             "--overlay-code-file",

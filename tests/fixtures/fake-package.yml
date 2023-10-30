@@ -5,8 +5,8 @@ metadata:
   namespace: test
 spec:
   package:
-    image: gcr.io/mkm-cloud/package-demo:v1
-    apiVersion: mkmik.pub/v1alpha1
+    image: ghcr.io/kubecfg/kubit/package-demo:v1
+    apiVersion: kubit.dev/v1alpha1
     spec:
       foo: 'bar'
       baz: 'qux'
