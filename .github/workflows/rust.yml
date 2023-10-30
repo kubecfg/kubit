@@ -27,7 +27,19 @@ jobs:
         run: cargo run -- manifests --crd-dir kustomize/crd/bases
       - name: Diff
         run: test -z "$(git status --porcelain)" || (echo 'Changes detected after generating manifests'; git status; git --no-pager diff; false)
-      - name: Run tests
+      - name: Run unit tests
+        run: cargo test --lib
+
+  integration_tests:
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+      - uses: Swatinem/rust-cache@a95ba195448af2da9b00fb742d14ffaaf3c21f43 # v2
+      - uses: AbsaOSS/k3d-action@4e8b3239042be1dc0aed6c5eb80c13b18200fc79 # v2.4.0
+        with:
+          cluster-name: "kubit-test-cluster-1"
+      - name: Run all tests
         run: cargo test
 
   pack:
