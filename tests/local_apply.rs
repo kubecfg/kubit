@@ -65,8 +65,7 @@ async fn local_apply_dry_run_render() {
     let output = from_utf8(&output).expect("unable to read output script");
 
     // Assert some known required items in the rendered output.
-    assert!(output.contains("apiVersion"));
-    assert!(output.contains("kind"));
+    assert!(output.contains("gar-docker-secret"));
     assert!(output.contains("StatefulSet"));
     assert!(output.contains("Service"));
     assert!(output.contains("AppInstance"));
