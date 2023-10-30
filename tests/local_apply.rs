@@ -20,10 +20,11 @@ async fn local_apply_dry_run_script() {
             "script",
             "--skip-auth",
         ])
-        .unwrap();
+        .unwrap()
+        .stdout
+        .to_vec();
 
-    let vectorised_output = &output.stdout.to_vec();
-    let output = from_utf8(vectorised_output).expect("unable to read output script");
+    let output = from_utf8(&output).expect("unable to read output script");
     let overlay_file = PathBuf::from(
         std::fs::canonicalize(TEST_FILE)
             .expect("unable to find realpath for test")
@@ -44,7 +45,6 @@ async fn local_apply_dry_run_script() {
     // When using --skip-auth we should not mount credentials
     assert!(!output.contains("DOCKER_CONFIG"));
 }
-
 
 #[tokio::test]
 async fn local_apply_dry_run_render() {
