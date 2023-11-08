@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
+use k8s_openapi::{api::core::v1::LocalObjectReference, apimachinery::pkg::apis::meta::v1::Time};
 use kube::{CustomResource, ResourceExt};
 use schemars::{
     schema::{Schema, SchemaObject},
@@ -32,13 +32,6 @@ impl AppInstance {
     pub fn namespace_any(&self) -> String {
         self.namespace().unwrap_or_default()
     }
-}
-
-// Like k8s_openapi::api::core::v1::LocalObjectReference but derives JsonSchema
-// so we can use it here.
-#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
-pub struct LocalObjectReference {
-    pub name: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
