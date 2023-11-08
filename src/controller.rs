@@ -427,20 +427,7 @@ async fn create_job(
     let ns = &app_instance.namespace().ok_or(Error::NamespaceRequired)?;
     let job_name = job_name_for(app_instance);
 
-    let volumes = vec![
-        Volume {
-            name: "docker".to_string(),
-            secret: Some(SecretVolumeSource {
-                secret_name: Some("gar-docker-secret".to_string()),
-                items: Some(vec![KeyToPath {
-                    key: ".dockerconfigjson".to_string(),
-                    path: "config.json".to_string(),
-                    ..Default::default()
-                }]),
-                ..Default::default()
-            }),
-            ..Default::default()
-        },
+    let mut volumes = vec![
         Volume {
             name: "overlay".to_string(),
             empty_dir: Some(Default::default()),
@@ -452,6 +439,28 @@ async fn create_job(
             ..Default::default()
         },
     ];
+
+    if let Some(ref refs) = app_instance.spec.image_pull_secrets {
+        let secret_ref = refs
+            .iter()
+            .exactly_one()
+            .map_err(|_| Error::UnsupportedMultipleImagePullSecrets)?;
+
+        let volume = Volume {
+            name: "docker".to_string(),
+            secret: Some(SecretVolumeSource {
+                secret_name: secret_ref.name.clone(),
+                items: Some(vec![KeyToPath {
+                    key: ".dockerconfigjson".to_string(),
+                    path: "config.json".to_string(),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        volumes.push(volume);
+    }
 
     let mk_mount = |name: &str| VolumeMount {
         name: name.to_string(),
