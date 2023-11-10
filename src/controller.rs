@@ -18,8 +18,10 @@ use kube::{
     api::{DeleteParams, ListParams, LogParams, Patch, PatchParams, PostParams, PropagationPolicy},
     core::ObjectMeta,
     runtime::{
-        conditions::{is_job_completed, Condition},
+        conditions::{is_deleted, is_job_completed, Condition},
         controller::{Action, Controller},
+        finalizer::{finalizer, Event as Finalizer},
+        wait::await_condition,
         watcher,
     },
     Api, Client, Resource, ResourceExt,
@@ -30,17 +32,26 @@ use oci_distribution::{secrets::RegistryAuth, Reference};
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    apply,
+    apply::{self, KUBIT_APPLIER_FIELD_MANAGER},
     docker_config::DockerConfig,
+    local,
     oci::{self, PackageConfig},
     render,
-    resources::{AppInstance, AppInstanceCondition, AppInstanceStatus},
+    resources::{self, AppInstance, AppInstanceCondition, AppInstanceStatus},
     Error, Result,
 };
 
 const KUBECTL_IMAGE: &str = "registry.k8s.io/kubectl:v1.28.0";
 
 const APPLIER_SERVICE_ACCOUNT: &str = "kubit-applier";
+
+const KUBIT_FINALIZER: &str = "kubit.appinstance";
+
+const KUBIT_API_GROUP: &str = "appinstances.kubecfg.dev";
+
+const APPLYSET_PART_OF_LABEL: &str = "applyset.kubernetes.io/part-of";
+const APPLYSET_ID_LABEL: &str = "applyset.kubernetes.io/id";
+const APPLYSET_CONTAINED_RESOURCE_LABEL: &str = "applyset.kubernetes.io/contains-group-resources";
 
 struct Context {
     client: Client,
@@ -125,6 +136,24 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
         return Ok(Action::await_change());
     }
 
+    let app_instance_api: Api<AppInstance> =
+        Api::namespaced(ctx.client.clone(), &app_instance.namespace_any());
+    finalizer(
+        &app_instance_api,
+        KUBIT_FINALIZER,
+        app_instance,
+        |event| async {
+            match event {
+                Finalizer::Apply(app_instance) => reconcile_apply(&app_instance, &ctx).await,
+                Finalizer::Cleanup(app_instance) => reconcile_cleanup(&app_instance, &ctx).await,
+            }
+        },
+    )
+    .await
+    .map_err(|e| Error::FinalizerError(Box::new(e)))
+}
+
+async fn reconcile_apply(app_instance: &AppInstance, ctx: &Context) -> Result<Action> {
     let state = reconciliation_state(&app_instance, &ctx).await?;
     info!(?state);
 
@@ -170,7 +199,7 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
         }
         ReconciliationState::Executing => {
             info!(
-                job_name = job_name_for(&app_instance),
+                job_name = job_name_for(&app_instance, "apply"),
                 "waiting for applier job execution"
             );
             Action::await_change()
@@ -225,13 +254,173 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
     Ok(action)
 }
 
+async fn reconcile_cleanup(app_instance: &AppInstance, ctx: &Context) -> Result<Action> {
+    info!(
+        name = app_instance.name_any(),
+        namespace = app_instance.namespace(),
+        "Cleaning up!"
+    );
+
+    let applyset_id = local::get_applyset_id(app_instance).unwrap();
+    info!("Applyset_id: {applyset_id}");
+
+    let contained_resources = get_contained_resources(app_instance, ctx).await.unwrap();
+    info!("Resources: {contained_resources:?}");
+
+    info!("Deleting the running job");
+    delete_job(app_instance, ctx).await?;
+
+    let jobs: Api<Job> = Api::namespaced(ctx.client.clone(), &app_instance.namespace_any());
+    let apply_job_name = job_name_for(app_instance, "apply");
+    let cleanup_job_name = job_name_for(app_instance, "cleanup");
+
+    info!("Awaiting termination of {apply_job_name}");
+    let apply_job = jobs.get(&apply_job_name).await.unwrap();
+    let job_uid = apply_job.uid().unwrap();
+    let cond = await_condition(jobs.clone(), &apply_job_name, is_deleted(&job_uid));
+
+    tokio::time::timeout(Duration::from_secs(30), cond)
+        .await
+        .unwrap();
+
+    info!("Setting up RBAC");
+    setup_job_rbac(app_instance, ctx).await?;
+    info!("Creating cleanup job");
+    launch_cleanup_job(app_instance, ctx).await?;
+
+    let cond = await_condition(jobs.clone(), &cleanup_job_name, is_job_completed());
+    info!("Awaiting completion of {cleanup_job_name}");
+    tokio::time::timeout(Duration::from_secs(30), cond)
+        .await
+        .unwrap();
+    Ok(Action::await_change())
+}
+
+async fn launch_cleanup_job(app_instance: &AppInstance, ctx: &Context) -> Result<()> {
+    let ns = &app_instance.namespace().ok_or(Error::NamespaceRequired)?;
+    let cleanup_job_name = format!("kubit-cleanup-{}", &app_instance.name_any());
+
+    let mut volumes = vec![];
+
+    if let Some(ref refs) = app_instance.spec.image_pull_secrets {
+        let secret_ref = refs
+            .iter()
+            .exactly_one()
+            .map_err(|_| Error::UnsupportedMultipleImagePullSecrets)?;
+
+        let volume = Volume {
+            name: "docker".to_string(),
+            secret: Some(SecretVolumeSource {
+                secret_name: secret_ref.name.clone(),
+                items: Some(vec![KeyToPath {
+                    key: ".dockerconfigjson".to_string(),
+                    path: "config.json".to_string(),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        volumes.push(volume);
+    }
+
+    let mk_mount = |name: &str| VolumeMount {
+        name: name.to_string(),
+        mount_path: format!("/{name}"),
+        ..Default::default()
+    };
+
+    let volume_mounts = Some(volumes.iter().map(|v| mk_mount(&v.name)).collect());
+    let container_defaults = Container {
+        volume_mounts: volume_mounts.clone(),
+        env: Some(vec![
+            EnvVar {
+                name: "DOCKER_CONFIG".to_string(),
+                value: Some("/docker".to_string()),
+                ..Default::default()
+            },
+            EnvVar {
+                name: "KUBECTL_APPLYSET".to_string(),
+                value: Some("true".to_string()),
+                ..Default::default()
+            },
+        ]),
+        ..Default::default()
+    };
+
+    let jobs: Api<Job> = Api::namespaced(ctx.client.clone(), ns);
+    let job = Job {
+        metadata: ObjectMeta {
+            name: Some(cleanup_job_name),
+            namespace: app_instance.namespace().clone(),
+            owner_references: owned_by(app_instance),
+            ..Default::default()
+        },
+        spec: Some(JobSpec {
+            backoff_limit: Some(0),
+            template: PodTemplateSpec {
+                spec: Some(PodSpec {
+                    service_account: Some(APPLIER_SERVICE_ACCOUNT.to_string()),
+                    restart_policy: Some("Never".to_string()),
+                    active_deadline_seconds: Some(180),
+                    volumes: Some(volumes),
+                    containers: vec![Container {
+                        name: "cleanup-manifests".to_string(),
+                        image: Some(KUBECTL_IMAGE.to_string()),
+                        command: Some(crate::delete::emit_commandline(app_instance, false)),
+                        ..container_defaults.clone()
+                    }],
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let pp = PostParams::default();
+
+    handle_resource_exists(jobs.create(&pp, &job).await)?;
+
+    Ok(())
+}
+
+async fn cleanup_resources(resources: Vec<String>) -> Result<Action> {
+    for resource in resources {}
+
+    Ok(Action::await_change())
+}
+
+async fn get_contained_resources(app_instance: &AppInstance, ctx: &Context) -> Result<Vec<String>> {
+    let name = &app_instance.name_any();
+    let secret_api: Api<Secret> = Api::namespaced(ctx.client.clone(), name);
+
+    let metadata = &secret_api.get_metadata(&name).await?;
+
+    if let Some(resources) = metadata
+        .annotations()
+        .get(APPLYSET_CONTAINED_RESOURCE_LABEL)
+    {
+        let r = resources
+            .split(",")
+            .map(|s| s.to_string())
+            // Skip the appinstance itself to avoid continued delete calls to the same resource.
+            .filter(|s| s != KUBIT_API_GROUP)
+            .collect::<Vec<_>>();
+
+        Ok(r)
+    } else {
+        todo!()
+    }
+}
+
 async fn reconciliation_state(
     app_instance: &AppInstance,
     ctx: &Context,
 ) -> Result<ReconciliationState> {
     let ns = app_instance.namespace_any();
     let api: Api<Job> = Api::namespaced(ctx.client.clone(), &ns);
-    let job_name = job_name_for(app_instance);
+    let job_name = job_name_for(app_instance, "apply");
     let job = api.get_opt(&job_name).await?;
 
     Ok(match job {
@@ -399,14 +588,14 @@ async fn launch_job(app_instance: &AppInstance, ctx: &Context) -> Result<()> {
     create_job(app_instance, kubecfg_image, ctx).await
 }
 
-fn job_name_for(app_instance: &AppInstance) -> String {
-    format!("kubit-apply-{}", app_instance.name_any())
+fn job_name_for(app_instance: &AppInstance, job_type: &str) -> String {
+    format!("kubit-{job_type}-{}", app_instance.name_any())
 }
 
 async fn delete_job(app_instance: &AppInstance, ctx: &Context) -> Result<()> {
     let ns = &app_instance.namespace().ok_or(Error::NamespaceRequired)?;
     let jobs: Api<Job> = Api::namespaced(ctx.client.clone(), ns);
-    let name = job_name_for(app_instance);
+    let name = job_name_for(app_instance, "apply");
     jobs.delete(
         &name,
         &DeleteParams {
@@ -425,7 +614,7 @@ async fn create_job(
     ctx: &Context,
 ) -> Result<()> {
     let ns = &app_instance.namespace().ok_or(Error::NamespaceRequired)?;
-    let job_name = job_name_for(app_instance);
+    let job_name = job_name_for(app_instance, "apply");
 
     let mut volumes = vec![
         Volume {
@@ -580,7 +769,7 @@ async fn capture_logs(
     info!(?ns, "reporting errors");
 
     let pods_api: Api<Pod> = Api::namespaced(ctx.client.clone(), ns);
-    let job_name = job_name_for(app_instance);
+    let job_name = job_name_for(app_instance, "apply");
 
     let pods = pods_api
         .list(&ListParams {
