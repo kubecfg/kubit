@@ -32,12 +32,12 @@ use oci_distribution::{secrets::RegistryAuth, Reference};
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    apply::{self, KUBIT_APPLIER_FIELD_MANAGER},
+    apply::{self},
     docker_config::DockerConfig,
     local,
     oci::{self, PackageConfig},
     render,
-    resources::{self, AppInstance, AppInstanceCondition, AppInstanceStatus},
+    resources::{AppInstance, AppInstanceCondition, AppInstanceStatus},
     Error, Result,
 };
 

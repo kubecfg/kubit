@@ -1,9 +1,11 @@
+use crate::{
+    apply::KUBECTL_APPLYSET_ENABLED,
+    apply::{KUBECTL_IMAGE, KUBIT_APPLIER_FIELD_MANAGER},
+    resources::AppInstance,
+};
+use home::home_dir;
 use k8s_openapi::api::core::v1::Namespace;
 use kube::core::ObjectMeta;
-use tracing::info;
-
-use crate::{resources::AppInstance, scripting::Script, Result, apply::KUBECTL_APPLYSET_ENABLED, apply::{KUBECTL_IMAGE, KUBIT_APPLIER_FIELD_MANAGER}};
-use home::home_dir;
 use kube::ResourceExt;
 use std::env;
 
@@ -76,7 +78,7 @@ pub fn emit_commandline(app_instance: &AppInstance, is_local: bool) -> Vec<Strin
             "--force-conflicts",
             "-v=2",
             "-f",
-            "-"
+            "-",
         ]
         .iter()
         .map(|s| s.to_string())
