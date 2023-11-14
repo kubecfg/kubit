@@ -35,7 +35,6 @@ use crate::{
     apply::{self},
     delete,
     docker_config::DockerConfig,
-    local,
     oci::{self, PackageConfig},
     render,
     resources::{AppInstance, AppInstanceCondition, AppInstanceStatus},

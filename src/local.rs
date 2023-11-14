@@ -210,7 +210,7 @@ fn apply_label_workaround() -> Script {
     )
 }
 
-pub fn get_applyset_id(app_instance: &AppInstance) -> Result<String> {
+fn get_applyset_id(app_instance: &AppInstance) -> Result<String> {
     // kubectl -n influxdb get secret influxdb -o jsonpath="{.metadata.labels.applyset\.kubernetes\.io/id}"
     let out = Command::new("kubectl")
         .arg("get")
