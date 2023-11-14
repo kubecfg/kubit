@@ -277,10 +277,12 @@ async fn reconcile_cleanup(app_instance: &AppInstance, ctx: &Context) -> Result<
 
         let cond = await_condition(jobs.clone(), &cleanup_job_name, is_job_completed());
         info!("Awaiting completion of {cleanup_job_name}");
-        let _ = tokio::time::timeout(Duration::from_secs(60), cond)
-            .await
-            .unwrap();
-        Ok(Action::await_change())
+        if let Err(e) = tokio::time::timeout(Duration::from_secs(120), cond).await {
+            error!("Deletion did not complete in time, requeuing: {}", e);
+            Ok(Action::requeue(Duration::from_secs(5)))
+        } else {
+            Ok(Action::await_change())
+        }
     }
 }
 
@@ -358,7 +360,7 @@ async fn launch_cleanup_job(app_instance: &AppInstance, ctx: &Context) -> Result
                     volumes: Some(volumes),
                     init_containers: Some(vec![Container {
                         name: "setup-delete".to_string(),
-                        image: Some("ghcr.io/kubecfg/kubit:latest".to_string()), // TODO: update on release
+                        image: Some("index.docker.io/jdockerty/kubit-local:latest".to_string()), // TODO: update on release
                         command: Some(delete::emit_deletion_setup(
                             &app_instance.namespace_any(),
                             "/manifests/ns.json",
