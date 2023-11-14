@@ -9,30 +9,12 @@ use kube::core::ObjectMeta;
 use kube::ResourceExt;
 use std::env;
 
-pub fn emit_commandline(app_instance: &AppInstance, is_local: bool) -> Vec<String> {
+pub fn emit_commandline(app_instance: &AppInstance, manifest_dir: &str, is_local: bool) -> Vec<String> {
     let mut cli: Vec<String> = vec![];
 
     let user_home = home_dir().expect("unable to retrieve home directory");
     let kube_config =
         env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
-
-    let namespace = Namespace {
-        metadata: ObjectMeta {
-            name: Some(app_instance.namespace_any()),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-
-    let ns = serde_yaml::to_string(&namespace).unwrap();
-
-    cli.extend(
-        // TODO: CHANGE THIS TO A BASIC VOLUME MOUNT
-        ["cat", &ns, "|"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>(),
-    );
 
     if is_local {
         cli.extend(
@@ -78,7 +60,7 @@ pub fn emit_commandline(app_instance: &AppInstance, is_local: bool) -> Vec<Strin
             "--force-conflicts",
             "-v=2",
             "-f",
-            "-",
+            manifest_dir,
         ]
         .iter()
         .map(|s| s.to_string())
@@ -86,4 +68,19 @@ pub fn emit_commandline(app_instance: &AppInstance, is_local: bool) -> Vec<Strin
     );
 
     cli
+}
+
+pub fn emit_deletion_setup(ns: &str, output_file: &str) -> Vec<String> {
+    [
+        "kubit",
+        "helper",
+        "cleanup",
+        "--namespace",
+        ns,
+        "--output",
+        output_file,
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect::<Vec<_>>()
 }
