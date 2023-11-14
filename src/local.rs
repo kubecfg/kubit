@@ -293,6 +293,7 @@ async fn write_cleanup_script(
     steps.extend([
         delete::setup_script(&app_instance, "/tmp/local-cleanup")?,
         delete::script(&app_instance, "/tmp/local-cleanup", is_local)?,
+        delete::post_pruning_script(&app_instance, is_local)?,
     ]);
 
     let script: Script = steps.into_iter().sum();

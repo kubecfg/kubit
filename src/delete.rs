@@ -76,11 +76,7 @@ pub fn emit_commandline(
     cli
 }
 
-pub fn emit_post_deletion_commandline(
-    app_instance: &AppInstance,
-    deletion_dir: &str,
-    is_local: bool,
-) -> Vec<String> {
+pub fn emit_post_deletion_commandline(app_instance: &AppInstance, is_local: bool) -> Vec<String> {
     let mut cli: Vec<String> = vec![];
 
     if is_local {
@@ -97,11 +93,6 @@ pub fn emit_post_deletion_commandline(
                 "host",
                 "-v",
                 &format!("{}:/.kube/config", kube_config),
-                // The empty applyset must be mounted to be seen by the container.
-                "-v",
-                &format!("{}:{}", deletion_dir, deletion_dir),
-                "--env",
-                KUBECTL_APPLYSET_ENABLED,
                 "--env",
                 "KUBECONFIG=/.kube/config",
                 KUBECTL_IMAGE,
@@ -121,19 +112,11 @@ pub fn emit_post_deletion_commandline(
 
     cli.extend(
         [
-            "apply",
-            "-n",
+            "delete",
+            "configmap",
+            &format!("{}-cleanup", &app_instance.name_any()),
+            "--namespace",
             &app_instance.namespace_any(),
-            "--server-side",
-            "--prune",
-            "--applyset",
-            &app_instance.name_any(),
-            "--field-manager",
-            KUBIT_APPLIER_FIELD_MANAGER,
-            "--force-conflicts",
-            "-v=2",
-            "-f",
-            deletion_dir,
         ]
         .iter()
         .map(|s| s.to_string())
@@ -160,12 +143,16 @@ pub fn emit_deletion_setup(ns: &str, output_file: &str) -> Vec<String> {
 
 /// Generates a shell script that will cleanup the created AppInstance resources.
 pub fn script(app_instance: &AppInstance, deletion_dir: &str, is_local: bool) -> Result<Script> {
-    let mut script = vec![];
-
     let tokens = emit_commandline(app_instance, deletion_dir, is_local);
-    script.extend(tokens);
+    Ok(Script::from_vec(tokens))
+}
 
-    Ok(Script::from_vec(script))
+/// Generates a shell script that is used post prune operation of the AppInstance
+/// resources. In other words, it is used to delete the blank ConfigMap that was
+/// used as the blank applyset.
+pub fn post_pruning_script(app_instance: &AppInstance, is_local: bool) -> Result<Script> {
+    let configmap_deletion = emit_post_deletion_commandline(app_instance, is_local);
+    Ok(Script::from_vec(configmap_deletion))
 }
 
 /// Generates a shell script that is used as a helper during the cleanup process
