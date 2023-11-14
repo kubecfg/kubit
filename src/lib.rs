@@ -59,11 +59,11 @@ pub mod controller;
 pub mod resources;
 
 pub mod apply;
+pub mod delete;
 pub mod helpers;
 pub mod local;
 pub mod metadata;
 pub mod render;
-pub mod delete;
 mod scripting;
 
 mod docker_config;

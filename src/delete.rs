@@ -9,7 +9,11 @@ use kube::core::ObjectMeta;
 use kube::ResourceExt;
 use std::env;
 
-pub fn emit_commandline(app_instance: &AppInstance, manifest_dir: &str, is_local: bool) -> Vec<String> {
+pub fn emit_commandline(
+    app_instance: &AppInstance,
+    manifest_dir: &str,
+    is_local: bool,
+) -> Vec<String> {
     let mut cli: Vec<String> = vec![];
 
     let user_home = home_dir().expect("unable to retrieve home directory");

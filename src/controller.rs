@@ -33,11 +33,11 @@ use tracing::{debug, error, info, warn};
 
 use crate::{
     apply::{self},
+    delete,
     docker_config::DockerConfig,
     local,
     oci::{self, PackageConfig},
     render,
-    delete,
     resources::{AppInstance, AppInstanceCondition, AppInstanceStatus},
     Error, Result,
 };
@@ -374,7 +374,7 @@ async fn launch_cleanup_job(app_instance: &AppInstance, ctx: &Context) -> Result
                     volumes: Some(volumes),
                     init_containers: Some(vec![Container {
                         name: "setup-delete".to_string(),
-                        image: Some(ctx.kubit_image.clone()), // TODO: update on release
+                        image: Some("ghcr.io/kubecfg/kubit:latest".to_string()), // TODO: update on release
                         command: Some(delete::emit_deletion_setup(
                             &app_instance.namespace_any(),
                             "/manifests/ns.json",
