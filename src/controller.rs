@@ -37,6 +37,7 @@ use crate::{
     local,
     oci::{self, PackageConfig},
     render,
+    delete,
     resources::{AppInstance, AppInstanceCondition, AppInstanceStatus},
     Error, Result,
 };
@@ -279,28 +280,35 @@ async fn reconcile_cleanup(app_instance: &AppInstance, ctx: &Context) -> Result<
     let job_uid = apply_job.uid().unwrap();
     let cond = await_condition(jobs.clone(), &apply_job_name, is_deleted(&job_uid));
 
-    tokio::time::timeout(Duration::from_secs(30), cond)
-        .await
-        .unwrap();
+    // Cleaning up the job can take some time and is an idempotent action, so we
+    // can requeue if upon failure.
+    if let Err(e) = tokio::time::timeout(Duration::from_secs(60), cond).await {
+        error!("Unable to delete resource, requeuing: {}", e);
+        Ok(Action::requeue(Duration::from_secs(5)))
+    } else {
+        info!("Setting up RBAC");
+        setup_job_rbac(app_instance, ctx).await?;
+        info!("Creating cleanup job");
+        launch_cleanup_job(app_instance, ctx).await?;
 
-    info!("Setting up RBAC");
-    setup_job_rbac(app_instance, ctx).await?;
-    info!("Creating cleanup job");
-    launch_cleanup_job(app_instance, ctx).await?;
-
-    let cond = await_condition(jobs.clone(), &cleanup_job_name, is_job_completed());
-    info!("Awaiting completion of {cleanup_job_name}");
-    tokio::time::timeout(Duration::from_secs(30), cond)
-        .await
-        .unwrap();
-    Ok(Action::await_change())
+        let cond = await_condition(jobs.clone(), &cleanup_job_name, is_job_completed());
+        info!("Awaiting completion of {cleanup_job_name}");
+        tokio::time::timeout(Duration::from_secs(60), cond)
+            .await
+            .unwrap();
+        Ok(Action::await_change())
+    }
 }
 
 async fn launch_cleanup_job(app_instance: &AppInstance, ctx: &Context) -> Result<()> {
     let ns = &app_instance.namespace().ok_or(Error::NamespaceRequired)?;
     let cleanup_job_name = format!("kubit-cleanup-{}", &app_instance.name_any());
 
-    let mut volumes = vec![];
+    let mut volumes = vec![Volume {
+        name: "manifests".to_string(),
+        empty_dir: Some(Default::default()),
+        ..Default::default()
+    }];
 
     if let Some(ref refs) = app_instance.spec.image_pull_secrets {
         let secret_ref = refs
@@ -308,7 +316,7 @@ async fn launch_cleanup_job(app_instance: &AppInstance, ctx: &Context) -> Result
             .exactly_one()
             .map_err(|_| Error::UnsupportedMultipleImagePullSecrets)?;
 
-        let volume = Volume {
+        let docker_creds = Volume {
             name: "docker".to_string(),
             secret: Some(SecretVolumeSource {
                 secret_name: secret_ref.name.clone(),
@@ -321,7 +329,7 @@ async fn launch_cleanup_job(app_instance: &AppInstance, ctx: &Context) -> Result
             }),
             ..Default::default()
         };
-        volumes.push(volume);
+        volumes.push(docker_creds);
     }
 
     let mk_mount = |name: &str| VolumeMount {
@@ -364,10 +372,23 @@ async fn launch_cleanup_job(app_instance: &AppInstance, ctx: &Context) -> Result
                     restart_policy: Some("Never".to_string()),
                     active_deadline_seconds: Some(180),
                     volumes: Some(volumes),
+                    init_containers: Some(vec![Container {
+                        name: "setup-delete".to_string(),
+                        image: Some(ctx.kubit_image.clone()), // TODO: update on release
+                        command: Some(delete::emit_deletion_setup(
+                            &app_instance.namespace_any(),
+                            "/manifests/ns.json",
+                        )),
+                        ..container_defaults.clone()
+                    }]),
                     containers: vec![Container {
                         name: "cleanup-manifests".to_string(),
                         image: Some(KUBECTL_IMAGE.to_string()),
-                        command: Some(crate::delete::emit_commandline(app_instance, false)),
+                        command: Some(delete::emit_commandline(
+                            app_instance,
+                            "/manifests/ns.json",
+                            false,
+                        )),
                         ..container_defaults.clone()
                     }],
                     ..Default::default()
