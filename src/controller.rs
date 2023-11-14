@@ -249,9 +249,6 @@ async fn reconcile_cleanup(app_instance: &AppInstance, ctx: &Context) -> Result<
         "Cleaning up!"
     );
 
-    let applyset_id = local::get_applyset_id(app_instance).unwrap();
-    info!("Applyset_id: {applyset_id}");
-
     info!("Deleting the running job");
     delete_job(app_instance, ctx).await?;
 
