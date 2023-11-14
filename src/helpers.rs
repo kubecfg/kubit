@@ -22,6 +22,16 @@ pub enum Helper {
 
         app_instance: String,
     },
+
+    // Use the applyset to initiate the cleanup operation.
+    // This will remove all resources created by the AppInstance.
+    Cleanup {
+        #[arg(long)]
+        namespace: String,
+
+        #[arg(long, help = "output file")]
+        output: String,
+    },
 }
 
 pub async fn run(helper: &Helper) -> Result<()> {
@@ -38,6 +48,23 @@ pub async fn run(helper: &Helper) -> Result<()> {
 
             let file = File::create(output)?;
             serde_json::to_writer_pretty(file, &app_instance)?;
+        }
+        Helper::Cleanup { namespace, output } => {
+            let file = File::create(output)?;
+
+            // As we use the kubectl applyset functionality, we can pass the namespace
+            // that the resources reside it to cleanup everything.
+            serde_json::to_writer_pretty(
+                file,
+                &serde_json::json!({
+                "apiVersion": "v1",
+                "kind": "Namespace",
+                "metadata": {
+                    "name": namespace
+                }
+                }
+                ),
+            )?;
         }
     }
     Ok(())
