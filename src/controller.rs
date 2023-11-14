@@ -48,12 +48,6 @@ const APPLIER_SERVICE_ACCOUNT: &str = "kubit-applier";
 
 const KUBIT_FINALIZER: &str = "kubit.appinstance";
 
-const KUBIT_API_GROUP: &str = "appinstances.kubecfg.dev";
-
-const APPLYSET_PART_OF_LABEL: &str = "applyset.kubernetes.io/part-of";
-const APPLYSET_ID_LABEL: &str = "applyset.kubernetes.io/id";
-const APPLYSET_CONTAINED_RESOURCE_LABEL: &str = "applyset.kubernetes.io/contains-group-resources";
-
 struct Context {
     client: Client,
     kubecfg_image: String,
@@ -155,7 +149,7 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
 }
 
 async fn reconcile_apply(app_instance: &AppInstance, ctx: &Context) -> Result<Action> {
-    let state = reconciliation_state(&app_instance, &ctx).await?;
+    let state = reconciliation_state(app_instance, ctx).await?;
     info!(?state);
 
     // We have two status conditions
@@ -168,11 +162,11 @@ async fn reconcile_apply(app_instance: &AppInstance, ctx: &Context) -> Result<Ac
 
     let action = match state {
         ReconciliationState::Idle => {
-            match launch_job(&app_instance, &ctx).await {
+            match launch_job(app_instance, ctx).await {
                 Ok(()) => {
                     update_condition(
-                        &app_instance,
-                        &ctx,
+                        app_instance,
+                        ctx,
                         "Reconcilier",
                         "False",
                         "ExpandingTemplate",
@@ -181,12 +175,12 @@ async fn reconcile_apply(app_instance: &AppInstance, ctx: &Context) -> Result<Ac
                     .await?;
                 }
                 Err(err) => {
-                    update_condition(&app_instance, &ctx, "Reconcilier", "False", "Failed", None)
+                    update_condition(app_instance, ctx, "Reconcilier", "False", "Failed", None)
                         .await?;
 
                     update_condition(
-                        &app_instance,
-                        &ctx,
+                        app_instance,
+                        ctx,
                         "Ready",
                         "False",
                         "Failed",
@@ -200,29 +194,22 @@ async fn reconcile_apply(app_instance: &AppInstance, ctx: &Context) -> Result<Ac
         }
         ReconciliationState::Executing => {
             info!(
-                job_name = job_name_for(&app_instance, "apply"),
+                job_name = job_name_for(app_instance, "apply"),
                 "waiting for applier job execution"
             );
             Action::await_change()
         }
         ReconciliationState::JobTerminated(job_uid, outcome) => {
-            let log_summary = capture_logs(&app_instance, &ctx, job_uid).await?;
+            let log_summary = capture_logs(app_instance, ctx, job_uid).await?;
 
             let action = match outcome {
                 JobOutcome::Success => {
                     info!("job completed successfully");
+                    update_condition(app_instance, ctx, "Reconcilier", "True", "Succeeded", None)
+                        .await?;
                     update_condition(
-                        &app_instance,
-                        &ctx,
-                        "Reconcilier",
-                        "True",
-                        "Succeeded",
-                        None,
-                    )
-                    .await?;
-                    update_condition(
-                        &app_instance,
-                        &ctx,
+                        app_instance,
+                        ctx,
                         "Ready",
                         "True",
                         "JobCompletedSuccessfully",
@@ -233,11 +220,11 @@ async fn reconcile_apply(app_instance: &AppInstance, ctx: &Context) -> Result<Ac
                 }
                 JobOutcome::Failure => {
                     info!("job failed");
-                    update_condition(&app_instance, &ctx, "Reconcilier", "True", "Failed", None)
+                    update_condition(app_instance, ctx, "Reconcilier", "True", "Failed", None)
                         .await?;
                     update_condition(
-                        &app_instance,
-                        &ctx,
+                        app_instance,
+                        ctx,
                         "Ready",
                         "False",
                         "JobFailed",
@@ -247,7 +234,7 @@ async fn reconcile_apply(app_instance: &AppInstance, ctx: &Context) -> Result<Ac
                     Action::requeue(Duration::from_secs(60))
                 }
             };
-            delete_job(&app_instance, &ctx).await?;
+            delete_job(app_instance, ctx).await?;
             action
         }
     };
@@ -264,9 +251,6 @@ async fn reconcile_cleanup(app_instance: &AppInstance, ctx: &Context) -> Result<
 
     let applyset_id = local::get_applyset_id(app_instance).unwrap();
     info!("Applyset_id: {applyset_id}");
-
-    let contained_resources = get_contained_resources(app_instance, ctx).await.unwrap();
-    info!("Resources: {contained_resources:?}");
 
     info!("Deleting the running job");
     delete_job(app_instance, ctx).await?;
@@ -293,7 +277,7 @@ async fn reconcile_cleanup(app_instance: &AppInstance, ctx: &Context) -> Result<
 
         let cond = await_condition(jobs.clone(), &cleanup_job_name, is_job_completed());
         info!("Awaiting completion of {cleanup_job_name}");
-        tokio::time::timeout(Duration::from_secs(60), cond)
+        let _ = tokio::time::timeout(Duration::from_secs(60), cond)
             .await
             .unwrap();
         Ok(Action::await_change())
@@ -404,35 +388,6 @@ async fn launch_cleanup_job(app_instance: &AppInstance, ctx: &Context) -> Result
     handle_resource_exists(jobs.create(&pp, &job).await)?;
 
     Ok(())
-}
-
-async fn cleanup_resources(resources: Vec<String>) -> Result<Action> {
-    for resource in resources {}
-
-    Ok(Action::await_change())
-}
-
-async fn get_contained_resources(app_instance: &AppInstance, ctx: &Context) -> Result<Vec<String>> {
-    let name = &app_instance.name_any();
-    let secret_api: Api<Secret> = Api::namespaced(ctx.client.clone(), name);
-
-    let metadata = &secret_api.get_metadata(&name).await?;
-
-    if let Some(resources) = metadata
-        .annotations()
-        .get(APPLYSET_CONTAINED_RESOURCE_LABEL)
-    {
-        let r = resources
-            .split(",")
-            .map(|s| s.to_string())
-            // Skip the appinstance itself to avoid continued delete calls to the same resource.
-            .filter(|s| s != KUBIT_API_GROUP)
-            .collect::<Vec<_>>();
-
-        Ok(r)
-    } else {
-        todo!()
-    }
 }
 
 async fn reconciliation_state(

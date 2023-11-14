@@ -4,8 +4,6 @@ use crate::{
     resources::AppInstance,
 };
 use home::home_dir;
-use k8s_openapi::api::core::v1::Namespace;
-use kube::core::ObjectMeta;
 use kube::ResourceExt;
 use std::env;
 
