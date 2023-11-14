@@ -11,7 +11,7 @@ use tempfile::NamedTempFile;
 
 use crate::{
     apply::{self, KUBIT_APPLIER_FIELD_MANAGER},
-    render,
+    delete, render,
     resources::AppInstance,
     scripting::Script,
 };
@@ -38,6 +38,19 @@ pub enum Local {
         /// Override the package image field in the spec
         #[clap(long)]
         package_image: Option<String>,
+    },
+
+    /// Cleanup the resources created by a packaged AppInstance.
+    ///
+    /// This removes all created resource, except the containing Namespace as it
+    /// is created outside of an applyset.
+    Cleanup {
+        /// Path to the file containing a (YAML) AppInstance manifest.
+        app_instance: String,
+
+        /// Dry run
+        #[clap(long)]
+        dry_run: Option<DryRun>,
     },
 }
 
@@ -68,6 +81,10 @@ pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()>
             )
             .await?;
         }
+        Local::Cleanup {
+            app_instance,
+            dry_run,
+        } => cleanup(app_instance, true, dry_run).await?,
     };
     Ok(())
 }
@@ -158,7 +175,7 @@ pub async fn apply(
         }
     }
 
-    write_script(
+    write_apply_script(
         app_instance,
         overlay_file_name,
         output,
@@ -220,7 +237,7 @@ fn get_script(dry_run: &Option<DryRun>) -> io::Result<(Box<dyn WriteClose>, Opti
 
 // TODO(jdockerty): refactor args to avoid a huge number of inputs.
 #[allow(clippy::too_many_arguments)]
-async fn write_script(
+async fn write_apply_script(
     app_instance: AppInstance,
     overlay_file_name: &str,
     mut output: Box<dyn WriteClose>,
@@ -261,6 +278,37 @@ async fn write_script(
     Ok(())
 }
 
+async fn write_cleanup_script(
+    app_instance: AppInstance,
+    mut output: Box<dyn WriteClose>,
+    is_local: bool,
+    path: Option<PathBuf>,
+) -> Result<()> {
+    let mut steps: Vec<Script> = vec![];
+
+    if !is_local {
+        steps.extend([Script::from_str("export KUBECTL_APPLYSET=true")]);
+    }
+
+    steps.extend([
+        delete::setup_script(&app_instance, "/tmp/local-cleanup")?,
+        delete::script(&app_instance, "/tmp/local-cleanup", is_local)?,
+    ]);
+
+    let script: Script = steps.into_iter().sum();
+
+    writeln!(output, "{script}")?;
+
+    // close the file but don't delete it until _deferred_delete_handle local var is in scope.
+    let _deferred_delete_handle = output.close()?;
+
+    if let Some(path) = path {
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755))?;
+        Command::new(path).status()?;
+    }
+    Ok(())
+}
+
 async fn prediff(
     overlay_file_name: &str,
     dry_run: &Option<DryRun>,
@@ -278,7 +326,7 @@ async fn prediff(
         app_instance.spec.package.image = package_image.clone();
     }
 
-    write_script(
+    write_apply_script(
         app_instance,
         overlay_file_name,
         output,
@@ -309,4 +357,15 @@ pub fn confirm_continue() -> bool {
     let mut buffer = [0; 1];
     std::io::stdin().read_exact(&mut buffer).unwrap();
     matches!(buffer[0], b'y' | b'Y')
+}
+
+pub async fn cleanup(app_instance: &str, is_local: bool, dry_run: &Option<DryRun>) -> Result<()> {
+    let (output, path) = get_script(dry_run)?;
+
+    let file = File::open(app_instance)?;
+    let app_instance: AppInstance = serde_yaml::from_reader(file)?;
+
+    write_cleanup_script(app_instance, output, is_local, path).await?;
+
+    Ok(())
 }

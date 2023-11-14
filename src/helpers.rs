@@ -23,8 +23,10 @@ pub enum Helper {
         app_instance: String,
     },
 
-    // Use the applyset to initiate the cleanup operation.
-    // This will remove all resources created by the AppInstance.
+    /// Initiate the cleanup process by leveraging an empty applyset.
+    ///
+    /// A single resource, a blank ConfigMap from the Namespace that the AppInstance resides within, is
+    /// written into a file that will ensure that all resources are automatically pruned.
     Cleanup {
         #[arg(long)]
         namespace: String,
@@ -50,22 +52,36 @@ pub async fn run(helper: &Helper) -> Result<()> {
             serde_json::to_writer_pretty(file, &app_instance)?;
         }
         Helper::Cleanup { namespace, output } => {
-            let file = File::create(output)?;
-
-            // As we use the kubectl applyset functionality, we can pass the namespace
-            // that the resources reside it to cleanup everything.
-            serde_json::to_writer_pretty(
-                file,
-                &serde_json::json!({
-                "apiVersion": "v1",
-                "kind": "Namespace",
-                "metadata": {
-                    "name": namespace
-                }
-                }
-                ),
-            )?;
+            create_cleanup_cm(namespace, &format!("{namespace}-cleanup"), output)?;
         }
     }
+    Ok(())
+}
+
+/// Write a blank ConfigMap to a file. This is used as a utility to help cleanup
+/// resources by leveraging the applyset functionality.
+///
+/// Unfortunately, we cannot use a blank object of kind `List` as the applyset
+/// requires that _some_ objects are passed to it.
+pub fn create_cleanup_cm(
+    namespace: &String,
+    configmap_name: &String,
+    output: &String,
+) -> Result<()> {
+    let file = File::create(output)?;
+
+    serde_json::to_writer_pretty(
+        file,
+        &serde_json::json!(
+        {
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": {
+                "name": configmap_name,
+                "namespace": namespace,
+            }
+        }),
+    )?;
+
     Ok(())
 }
