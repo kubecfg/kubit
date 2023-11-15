@@ -11,7 +11,7 @@ use tempfile::NamedTempFile;
 
 use crate::{
     apply::{self, KUBIT_APPLIER_FIELD_MANAGER},
-    delete, render,
+    cleanup, render,
     resources::AppInstance,
     scripting::Script,
 };
@@ -291,9 +291,9 @@ async fn write_cleanup_script(
     }
 
     steps.extend([
-        delete::setup_script(&app_instance, "/tmp/local-cleanup")?,
-        delete::script(&app_instance, "/tmp/local-cleanup", is_local)?,
-        delete::post_pruning_script(&app_instance, is_local)?,
+        cleanup::setup_script(&app_instance, "/tmp/local-cleanup")?,
+        cleanup::script(&app_instance, "/tmp/local-cleanup", is_local)?,
+        cleanup::post_pruning_script(&app_instance, is_local)?,
     ]);
 
     let script: Script = steps.into_iter().sum();

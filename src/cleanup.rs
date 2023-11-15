@@ -114,7 +114,7 @@ pub fn emit_post_deletion_commandline(app_instance: &AppInstance, is_local: bool
         [
             "delete",
             "configmap",
-            &format!("{}-cleanup", &app_instance.name_any()),
+            &configmap_name_for(app_instance.name_any()),
             "--namespace",
             &app_instance.namespace_any(),
         ]
@@ -139,6 +139,11 @@ pub fn emit_deletion_setup(ns: &str, output_file: &str) -> Vec<String> {
     .iter()
     .map(|s| s.to_string())
     .collect::<Vec<_>>()
+}
+
+/// Utility to generate the cleanup configmap name based on a given name.
+pub fn configmap_name_for(name: String) -> String {
+    format!("{name}-cleanup")
 }
 
 /// Generates a shell script that will cleanup the created AppInstance resources.

@@ -33,7 +33,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::{
     apply::{self},
-    delete,
+    cleanup,
     docker_config::DockerConfig,
     oci::{self, PackageConfig},
     render,
@@ -357,7 +357,7 @@ async fn launch_cleanup_job(app_instance: &AppInstance, ctx: &Context) -> Result
                     init_containers: Some(vec![Container {
                         name: "setup-delete".to_string(),
                         image: Some("index.docker.io/jdockerty/kubit-local:latest".to_string()), // TODO: update on release
-                        command: Some(delete::emit_deletion_setup(
+                        command: Some(cleanup::emit_deletion_setup(
                             &app_instance.namespace_any(),
                             "/manifests/cm.json",
                         )),
@@ -366,7 +366,7 @@ async fn launch_cleanup_job(app_instance: &AppInstance, ctx: &Context) -> Result
                     containers: vec![Container {
                         name: "cleanup-manifests".to_string(),
                         image: Some(KUBECTL_IMAGE.to_string()),
-                        command: Some(delete::emit_commandline(
+                        command: Some(cleanup::emit_commandline(
                             app_instance,
                             "/manifests/cm.json",
                             false,
