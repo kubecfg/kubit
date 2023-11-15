@@ -1,6 +1,9 @@
 use assert_cmd::prelude::*;
+use k8s_openapi::api::core::v1::ConfigMap;
 use k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service};
+use kube::ResourceExt;
 use kube::{api::ListParams, client, Api};
+use kubit::cleanup::configmap_name_for;
 use kubit::resources::AppInstance;
 use std::fs::File;
 use std::process::Command;
@@ -25,8 +28,12 @@ async fn local_cleanup() {
         .await
         .expect("Unable to create default kubernetes client");
 
-    let sts_api: Api<StatefulSet> = Api::namespaced(client.clone(), &app_instance.namespace_any());
-    let svc_api: Api<Service> = Api::namespaced(client.clone(), &app_instance.namespace_any());
+    let namespace = &app_instance.namespace_any();
+
+    let sts_api: Api<StatefulSet> = Api::namespaced(client.clone(), namespace);
+    let svc_api: Api<Service> = Api::namespaced(client.clone(), namespace);
+    let cm_api: Api<ConfigMap> = Api::namespaced(client.clone(), namespace);
+    let cleanup_cm_name = configmap_name_for(app_instance.name_any());
     let list_params = ListParams::default();
 
     let sts = sts_api
@@ -37,9 +44,25 @@ async fn local_cleanup() {
         .list(&list_params)
         .await
         .expect("Unable to list Services");
+    let cleanup_cm = cm_api
+        .get_opt(&cleanup_cm_name)
+        .await
+        .expect("Unable to get {cleanup_cm_name} ConfigMap");
 
-    // Items were pruned using a blank applyset, there should be 0 returned from
-    // the Kubernetes API server.
-    assert_eq!(sts.items.len(), 0);
-    assert_eq!(svc.items.len(), 0);
+    assert_eq!(
+        sts.items.len(),
+        0,
+        "StatefulSets should have been pruned, expected 0 but got {}",
+        sts.items.len()
+    );
+    assert_eq!(
+        svc.items.len(),
+        0,
+        "Services should have been pruned, expected 0 but got {}",
+        svc.items.len()
+    );
+    assert_eq!(
+        cleanup_cm, None,
+        "ConfigMap for cleanup should not exist but was found!"
+    );
 }
