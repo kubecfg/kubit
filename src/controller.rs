@@ -61,15 +61,26 @@ pub async fn run(
     kubecfg_image: String,
     kubit_image: String,
     only_paused: bool,
+    watched_namespace: Option<String>,
 ) -> Result<()> {
-    let docs = Api::<AppInstance>::all(client.clone());
+    let namespace = watched_namespace.as_deref();
+    let docs = if let Some(ns) = namespace {
+        Api::<AppInstance>::namespaced(client.clone(), ns)
+    } else {
+        Api::<AppInstance>::all(client.clone())
+    };
+
     if let Err(e) = docs.list(&ListParams::default().limit(1)).await {
         error!("CRD is not queryable; {e:?}. Is the CRD installed?");
         std::process::exit(1);
     }
 
     info!("running kubit manager");
-    let jobs = Api::<Job>::all(client.clone());
+    let jobs = if let Some(ns) = namespace {
+        Api::<Job>::namespaced(client.clone(), ns)
+    } else {
+        Api::<Job>::all(client.clone())
+    };
     Controller::new(docs, watcher::Config::default().any_semantic())
         .shutdown_on_signal()
         .owns(jobs, watcher::Config::default().any_semantic())
@@ -81,6 +92,7 @@ pub async fn run(
                 kubecfg_image,
                 kubit_image,
                 only_paused,
+                watched_namespace,
             }),
         )
         .filter_map(|x| async move { std::result::Result::ok(x) })

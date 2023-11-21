@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubit
+  namespace: kubit
+spec:
+  template:
+    spec:
+      containers:
+        - image: ghcr.io/jeffreyssmith2nd/kubit:single-namespace-2
+          name: manager
+          args: [ "--watched-namespace",  "influxdb" ]
+          env:
+            - name: KUBIT_CONTROLLER_IMAGE
+              value: ghcr.io/jeffreyssmith2nd/kubit:single-namespace-2
