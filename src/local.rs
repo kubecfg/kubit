@@ -35,6 +35,11 @@ pub enum Local {
         #[clap(long, default_value = "false")]
         skip_auth: bool,
 
+        /// Use Docker containers for dependencies, rather than relying on locally installed
+        /// versions.
+        #[clap(long, default_value = "false")]
+        docker: bool,
+
         /// Override the package image field in the spec
         #[clap(long)]
         package_image: Option<String>,
@@ -56,6 +61,7 @@ pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()>
             package_image,
             pre_diff,
             skip_auth,
+            docker,
         } => {
             apply(
                 app_instance,
@@ -63,7 +69,7 @@ pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()>
                 package_image,
                 impersonate_user,
                 *pre_diff,
-                true,
+                *docker,
                 *skip_auth,
             )
             .await?;
@@ -127,7 +133,7 @@ pub async fn apply(
     package_image: &Option<String>,
     impersonate_user: &Option<String>,
     pre_diff: bool,
-    is_local: bool,
+    docker: bool,
     skip_auth: bool,
 ) -> Result<()> {
     let (output, path) = get_script(dry_run)?;
@@ -149,7 +155,7 @@ pub async fn apply(
             dry_run,
             package_image,
             impersonate_user,
-            true,
+            docker,
             skip_auth,
         )
         .await?;
@@ -164,7 +170,7 @@ pub async fn apply(
         output,
         dry_run,
         impersonate_user,
-        is_local,
+        docker,
         skip_auth,
         path,
     )
@@ -226,23 +232,23 @@ async fn write_script(
     mut output: Box<dyn WriteClose>,
     dry_run: &Option<DryRun>,
     impersonate_user: &Option<String>,
-    is_local: bool,
+    docker: bool,
     skip_auth: bool,
     path: Option<PathBuf>,
 ) -> Result<()> {
     let mut steps: Vec<Script> = vec![];
 
-    if !is_local {
+    if !docker {
         steps.extend([Script::from_str("export KUBECTL_APPLYSET=true")]);
     }
 
     steps.extend([
-        render::script(&app_instance, overlay_file_name, None, is_local, skip_auth).await?
+        render::script(&app_instance, overlay_file_name, None, docker, skip_auth).await?
             | match dry_run {
                 Some(DryRun::Render) => Script::from_str("cat"),
                 Some(DryRun::Diff) => diff(&app_instance)?,
                 Some(DryRun::Script) | None => {
-                    apply::script(&app_instance, "-", impersonate_user, is_local)?
+                    apply::script(&app_instance, "-", impersonate_user, docker)?
                 }
             },
     ]);
@@ -266,7 +272,7 @@ async fn prediff(
     dry_run: &Option<DryRun>,
     package_image: &Option<String>,
     impersonate_user: &Option<String>,
-    is_local: bool,
+    docker: bool,
     skip_auth: bool,
 ) -> Result<()> {
     let (output, path) = get_script(dry_run)?;
@@ -284,7 +290,7 @@ async fn prediff(
         output,
         dry_run,
         impersonate_user,
-        is_local,
+        docker,
         skip_auth,
         path,
     )
