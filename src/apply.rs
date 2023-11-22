@@ -8,11 +8,11 @@ pub const KUBECTL_IMAGE: &str = "bitnami/kubectl:1.27.5";
 pub const KUBECTL_APPLYSET_ENABLED: &str = "KUBECTL_APPLYSET=true";
 
 /// Generates shell script that will apply the manifests and writes it to w
-pub fn emit_script<W>(app_instance: &AppInstance, is_local: bool, w: &mut W) -> Result<()>
+pub fn emit_script<W>(app_instance: &AppInstance, docker: bool, w: &mut W) -> Result<()>
 where
     W: std::io::Write,
 {
-    let script = script(app_instance, "/tmp/manifests", &None, is_local)?;
+    let script = script(app_instance, "/tmp/manifests", &None, docker)?;
     write!(w, "{script}")?;
     Ok(())
 }
@@ -22,9 +22,9 @@ pub fn script(
     app_instance: &AppInstance,
     manifests_dir: &str,
     impersonate_user: &Option<String>,
-    is_local: bool,
+    docker: bool,
 ) -> Result<Script> {
-    let tokens = emit_commandline(app_instance, manifests_dir, impersonate_user, is_local);
+    let tokens = emit_commandline(app_instance, manifests_dir, impersonate_user, docker);
     Ok(Script::from_vec(tokens))
 }
 
@@ -32,7 +32,7 @@ pub fn emit_commandline(
     app_instance: &AppInstance,
     manifests_dir: &str,
     impersonate_user: &Option<String>,
-    is_local: bool,
+    docker: bool,
 ) -> Vec<String> {
     let mut cli: Vec<String> = vec![];
 
@@ -41,7 +41,7 @@ pub fn emit_commandline(
     let kube_config =
         env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
 
-    if is_local {
+    if docker {
         cli.extend(
             [
                 "docker",
@@ -117,7 +117,7 @@ mod tests {
     #[test]
     fn apply_emit_commandline() {
         let app_instance = arrange_app_instance();
-        let is_local = false;
+        let docker = false;
         let fake_manifest_dir = "/tmp/test";
 
         let expected = vec![
@@ -137,7 +137,7 @@ mod tests {
             fake_manifest_dir,
         ];
 
-        let output = emit_commandline(&app_instance, fake_manifest_dir, &None, is_local);
+        let output = emit_commandline(&app_instance, fake_manifest_dir, &None, docker);
 
         assert_eq!(output, expected);
     }

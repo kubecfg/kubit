@@ -8,7 +8,7 @@ pub const KUBECFG_IMAGE: &str = "ghcr.io/kubecfg/kubecfg/kubecfg";
 /// Generates shell script that will render the manifest and writes it to writer.
 pub async fn emit_script<W>(
     app_instance: &AppInstance,
-    is_local: bool,
+    docker: bool,
     skip_auth: bool,
     w: &mut W,
 ) -> Result<()>
@@ -23,7 +23,7 @@ where
         app_instance,
         &path.to_string_lossy(),
         Some("/tmp/manifests"),
-        is_local,
+        docker,
         skip_auth,
     )
     .await?;
@@ -36,14 +36,14 @@ pub async fn script(
     app_instance: &AppInstance,
     overlay_file_name: &str,
     output_dir: Option<&str>,
-    is_local: bool,
+    docker: bool,
     skip_auth: bool,
 ) -> Result<Script> {
     let tokens = emit_commandline(
         app_instance,
         overlay_file_name,
         output_dir,
-        is_local,
+        docker,
         skip_auth,
     )
     .await;
@@ -54,7 +54,7 @@ pub async fn emit_commandline(
     app_instance: &AppInstance,
     overlay_file: &str,
     output_dir: Option<&str>,
-    is_local: bool,
+    docker: bool,
     skip_auth: bool,
 ) -> Vec<String> {
     let image = &app_instance.spec.package.image;
@@ -67,7 +67,7 @@ pub async fn emit_commandline(
 
     let mut cli: Vec<String> = vec![];
 
-    if is_local {
+    if docker {
         let overlay_path = std::fs::canonicalize(overlay_file).unwrap();
         let overlay_file_name = std::path::PathBuf::from(overlay_path.file_name().unwrap());
         let user_home = home_dir().expect("unable to retrieve home directory");
@@ -144,7 +144,7 @@ pub async fn emit_commandline(
 
     // Running as `kubit local apply` requires a different overlay path,
     // as the file is mounted to the container.
-    if is_local {
+    if docker {
         let overlay_path = std::fs::canonicalize(overlay_file).unwrap();
         let overlay_file_name = std::path::PathBuf::from(overlay_path.file_name().unwrap());
         cli.extend(
@@ -217,7 +217,7 @@ mod tests {
     #[tokio::test]
     async fn render_emit_commandline() {
         let app_instance = arrange_app_instance();
-        let is_local = false;
+        let docker = false;
         let skip_auth = false;
 
         let test_overlay_file = &format!("appInstance_={}", TEST_PACKAGE_FILE);
@@ -232,7 +232,7 @@ mod tests {
         ];
 
         let output =
-            emit_commandline(&app_instance, TEST_PACKAGE_FILE, None, is_local, skip_auth).await;
+            emit_commandline(&app_instance, TEST_PACKAGE_FILE, None, docker, skip_auth).await;
 
         assert_eq!(output, expected);
     }
