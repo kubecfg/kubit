@@ -1,6 +1,6 @@
 # Leveraging the pre-built Docker images with
 # cargo-chef and the Rust toolchain
-FROM lukemathwalker/cargo-chef:latest-rust-1.73.0@sha256:6c338c835b4fe7246bfcc7b7dc300124fd2f2524111c1506cc2abdc65759d859 AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-1.74.0@sha256:13bb348435b280c4f86a0bfd207c8e6e1e7e6a6db1ca9452eec6697f427b344e AS chef
 WORKDIR app
 
 FROM chef AS planner
@@ -16,7 +16,7 @@ COPY . .
 RUN cargo build --release --bin kubit
 
 # We do not need the Rust toolchain to run the binary!
-FROM debian:bookworm-slim@sha256:6cc67f78e0e8295b4fbe055eba0356648f149daf15db9179aa51fcfa9cc131cd AS runtime
+FROM debian:bookworm-slim@sha256:2bc5c236e9b262645a323e9088dfa3bb1ecb16cc75811daf40a23a824d665be9 AS runtime
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*

@@ -18,6 +18,7 @@ async fn local_apply_dry_run_script() {
             TEST_FILE,
             "--dry-run",
             "script",
+            "--docker",
             "--skip-auth",
         ])
         .unwrap()
@@ -56,6 +57,7 @@ async fn local_apply_dry_run_render() {
             TEST_FILE,
             "--dry-run",
             "render",
+            "--docker",
             "--skip-auth",
         ])
         .unwrap()
