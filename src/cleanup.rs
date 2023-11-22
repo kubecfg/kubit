@@ -12,11 +12,11 @@ use std::env;
 pub fn emit_commandline(
     app_instance: &AppInstance,
     deletion_dir: &str,
-    is_local: bool,
+    docker: bool,
 ) -> Vec<String> {
     let mut cli: Vec<String> = vec![];
 
-    if is_local {
+    if docker {
         let user_home = home_dir().expect("unable to retrieve home directory");
         let kube_config =
             env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
@@ -76,10 +76,10 @@ pub fn emit_commandline(
     cli
 }
 
-pub fn emit_post_deletion_commandline(app_instance: &AppInstance, is_local: bool) -> Vec<String> {
+pub fn emit_post_deletion_commandline(app_instance: &AppInstance, docker: bool) -> Vec<String> {
     let mut cli: Vec<String> = vec![];
 
-    if is_local {
+    if docker {
         let user_home = home_dir().expect("unable to retrieve home directory");
         let kube_config =
             env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
@@ -147,16 +147,16 @@ pub fn configmap_name_for(name: String) -> String {
 }
 
 /// Generates a shell script that will cleanup the created AppInstance resources.
-pub fn script(app_instance: &AppInstance, deletion_dir: &str, is_local: bool) -> Result<Script> {
-    let tokens = emit_commandline(app_instance, deletion_dir, is_local);
+pub fn script(app_instance: &AppInstance, deletion_dir: &str, docker: bool) -> Result<Script> {
+    let tokens = emit_commandline(app_instance, deletion_dir, docker);
     Ok(Script::from_vec(tokens))
 }
 
 /// Generates a shell script that is used post prune operation of the AppInstance
 /// resources. In other words, it is used to delete the blank ConfigMap that was
 /// used as the blank applyset.
-pub fn post_pruning_script(app_instance: &AppInstance, is_local: bool) -> Result<Script> {
-    let configmap_deletion = emit_post_deletion_commandline(app_instance, is_local);
+pub fn post_pruning_script(app_instance: &AppInstance, docker: bool) -> Result<Script> {
+    let configmap_deletion = emit_post_deletion_commandline(app_instance, docker);
     Ok(Script::from_vec(configmap_deletion))
 }
 

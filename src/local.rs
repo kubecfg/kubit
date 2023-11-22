@@ -56,6 +56,11 @@ pub enum Local {
         /// Dry run
         #[clap(long)]
         dry_run: Option<DryRun>,
+
+        /// Use Docker containers for dependencies, rather than relying on locally installed
+        /// versions.
+        #[clap(long, default_value = "false")]
+        docker: bool,
     },
 }
 
@@ -89,8 +94,9 @@ pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()>
         }
         Local::Cleanup {
             app_instance,
+            docker,
             dry_run,
-        } => cleanup(app_instance, true, dry_run).await?,
+        } => cleanup(app_instance, *docker, dry_run).await?,
     };
     Ok(())
 }
@@ -287,19 +293,19 @@ async fn write_apply_script(
 async fn write_cleanup_script(
     app_instance: AppInstance,
     mut output: Box<dyn WriteClose>,
-    is_local: bool,
+    docker: bool,
     path: Option<PathBuf>,
 ) -> Result<()> {
     let mut steps: Vec<Script> = vec![];
 
-    if !is_local {
+    if !docker {
         steps.extend([Script::from_str("export KUBECTL_APPLYSET=true")]);
     }
 
     steps.extend([
         cleanup::setup_script(&app_instance, "/tmp/local-cleanup")?,
-        cleanup::script(&app_instance, "/tmp/local-cleanup", is_local)?,
-        cleanup::post_pruning_script(&app_instance, is_local)?,
+        cleanup::script(&app_instance, "/tmp/local-cleanup", docker)?,
+        cleanup::post_pruning_script(&app_instance, docker)?,
     ]);
 
     let script: Script = steps.into_iter().sum();
@@ -366,13 +372,13 @@ pub fn confirm_continue() -> bool {
     matches!(buffer[0], b'y' | b'Y')
 }
 
-pub async fn cleanup(app_instance: &str, is_local: bool, dry_run: &Option<DryRun>) -> Result<()> {
+pub async fn cleanup(app_instance: &str, docker: bool, dry_run: &Option<DryRun>) -> Result<()> {
     let (output, path) = get_script(dry_run)?;
 
     let file = File::open(app_instance)?;
     let app_instance: AppInstance = serde_yaml::from_reader(file)?;
 
-    write_cleanup_script(app_instance, output, is_local, path).await?;
+    write_cleanup_script(app_instance, output, docker, path).await?;
 
     Ok(())
 }
