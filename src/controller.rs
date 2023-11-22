@@ -246,38 +246,53 @@ async fn reconcile_cleanup(app_instance: &AppInstance, ctx: &Context) -> Result<
         namespace = app_instance.namespace(),
         "Cleaning up!"
     );
-
-    info!("Deleting the running job");
-    delete_job(app_instance, ctx).await?;
-
     let jobs: Api<Job> = Api::namespaced(ctx.client.clone(), &app_instance.namespace_any());
     let apply_job_name = job_name_for(app_instance, "apply");
     let cleanup_job_name = job_name_for(app_instance, "cleanup");
 
-    info!("Awaiting termination of {apply_job_name}");
-    let apply_job = jobs.get(&apply_job_name).await.unwrap();
-    let job_uid = apply_job.uid().unwrap();
-    let cond = await_condition(jobs.clone(), &apply_job_name, is_deleted(&job_uid));
+    match jobs.get_opt(&apply_job_name).await? {
+        Some(apply_job) => {
+            info!("Deleting the running job");
+            delete_job(app_instance, ctx).await?;
 
-    // Cleaning up the job can take some time and is an idempotent action, so we
-    // can requeue if upon failure.
-    if let Err(e) = tokio::time::timeout(Duration::from_secs(60), cond).await {
-        error!("Unable to delete resource, requeuing: {}", e);
+            info!("Awaiting termination of {apply_job_name}");
+            let job_uid = apply_job.uid().unwrap();
+            let cond = await_condition(jobs.clone(), &apply_job_name, is_deleted(&job_uid));
+            // Cleaning up the job can take some time and is an idempotent action, so we
+            // can requeue if upon failure.
+            if let Err(e) = tokio::time::timeout(Duration::from_secs(60), cond).await {
+                error!("Unable to delete resource, requeuing: {}", e);
+                Ok(Action::requeue(Duration::from_secs(5)))
+            } else {
+                create_cleanup(app_instance, jobs, &cleanup_job_name, ctx).await
+            }
+        }
+        None => {
+            info!("No Job found for {apply_job_name}, proceeding to cleanup");
+            create_cleanup(app_instance, jobs, &cleanup_job_name, ctx).await
+        }
+    }
+}
+
+async fn create_cleanup(
+    app_instance: &AppInstance,
+    jobs: Api<Job>,
+    job_name: &str,
+    ctx: &Context,
+) -> Result<Action> {
+    info!("Setting up RBAC");
+    setup_job_rbac(app_instance, ctx).await?;
+    info!("Creating cleanup job");
+    launch_cleanup_job(app_instance, ctx).await?;
+
+    let cond = await_condition(jobs, job_name, is_job_completed());
+    info!("Awaiting completion of {job_name}");
+    if let Err(e) = tokio::time::timeout(Duration::from_secs(120), cond).await {
+        error!("Deletion did not complete in time, requeuing: {}", e);
         Ok(Action::requeue(Duration::from_secs(5)))
     } else {
-        info!("Setting up RBAC");
-        setup_job_rbac(app_instance, ctx).await?;
-        info!("Creating cleanup job");
-        launch_cleanup_job(app_instance, ctx).await?;
-
-        let cond = await_condition(jobs.clone(), &cleanup_job_name, is_job_completed());
-        info!("Awaiting completion of {cleanup_job_name}");
-        if let Err(e) = tokio::time::timeout(Duration::from_secs(120), cond).await {
-            error!("Deletion did not complete in time, requeuing: {}", e);
-            Ok(Action::requeue(Duration::from_secs(5)))
-        } else {
-            Ok(Action::await_change())
-        }
+        info!("{job_name} deleted");
+        Ok(Action::await_change())
     }
 }
 
