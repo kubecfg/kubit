@@ -32,8 +32,7 @@ use oci_distribution::{secrets::RegistryAuth, Reference};
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    apply::{self},
-    cleanup,
+    apply, cleanup,
     docker_config::DockerConfig,
     oci::{self, PackageConfig},
     render,
@@ -45,7 +44,7 @@ const KUBECTL_IMAGE: &str = "registry.k8s.io/kubectl:v1.28.0";
 
 const APPLIER_SERVICE_ACCOUNT: &str = "kubit-applier";
 
-const KUBIT_FINALIZER: &str = "kubit.appinstance";
+const KUBIT_FINALIZER: &str = "kubecfg.dev/appinstance-cleanup";
 
 struct Context {
     client: Client,
