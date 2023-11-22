@@ -288,7 +288,7 @@ async fn prediff(
         app_instance,
         overlay_file_name,
         output,
-        dry_run,
+        &Some(DryRun::Diff),
         impersonate_user,
         docker,
         skip_auth,
