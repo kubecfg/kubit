@@ -24,10 +24,13 @@ impl Script {
     }
 }
 
-// Quote all strings expect for explicit bash variable references
+// Quote all strings expect for explicit bash variable references and
+// redirection.
 fn quoted(src: &String) -> String {
     if src.starts_with("${") {
         format!(r#""{src}""#)
+    } else if src.starts_with(">") {
+        format!(r#"{src}"#)
     } else {
         yash_quote::quoted(src).to_string()
     }
