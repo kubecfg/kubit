@@ -374,6 +374,11 @@ async fn launch_cleanup_job(app_instance: &AppInstance, ctx: &Context) -> Result
                         command: Some(delete::emit_deletion_setup(
                             &app_instance.name_any(),
                             &app_instance.namespace_any(),
+                            &format!(
+                                "/manifests/cm-{}",
+                                delete::cleanup_hack_resource_name(app_instance)
+                            ),
+                            false,
                         )),
                         ..container_defaults.clone()
                     }]),
@@ -382,7 +387,10 @@ async fn launch_cleanup_job(app_instance: &AppInstance, ctx: &Context) -> Result
                         image: Some(KUBECTL_IMAGE.to_string()),
                         command: Some(delete::emit_commandline(
                             app_instance,
-                            "/manifests/cm.json",
+                            &format!(
+                                "/manifests/cm-{}",
+                                delete::cleanup_hack_resource_name(app_instance)
+                            ),
                             false,
                         )),
                         ..container_defaults.clone()

@@ -297,13 +297,20 @@ async fn write_delete_script(
     path: Option<PathBuf>,
 ) -> Result<()> {
     let mut steps: Vec<Script> = vec![];
+    let tmp_dir = TempDir::new().unwrap();
+    let output_path = &format!(
+        "{}/{}",
+        tmp_dir.path().display(),
+        cleanup_hack_resource_name(&app_instance)
+    );
 
     if !docker {
         steps.extend([Script::from_str("export KUBECTL_APPLYSET=true")]);
     }
 
     steps.extend([
-        delete::setup_script(&app_instance)? | delete::script(&app_instance, "-", docker)?,
+        delete::setup_script(&app_instance, output_path, docker)?,
+        delete::script(&app_instance, output_path, docker)?,
         delete::post_pruning_script(&app_instance, docker)?,
     ]);
 

@@ -131,20 +131,63 @@ pub fn emit_post_deletion_commandline(app_instance: &AppInstance, docker: bool) 
 ///
 /// Unfortunately, we cannot use a blank object of kind `List` as the applyset
 /// requires that _some_ objects are passed to it.
-pub fn emit_deletion_setup(name: &str, namespace: &str) -> Vec<String> {
-    [
-        "kubectl",
-        "create",
-        "configmap",
-        name,
-        "--namespace",
-        namespace,
-        "--dry-run=client",
-        "-o=yaml",
-    ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect::<Vec<_>>()
+pub fn emit_deletion_setup(
+    name: &str,
+    namespace: &str,
+    output_path: &str,
+    docker: bool,
+) -> Vec<String> {
+    let mut cli: Vec<String> = vec![];
+
+    if docker {
+        let user_home = home_dir().expect("unable to retrieve home directory");
+        let kube_config =
+            env::var("KUBECONFIG").unwrap_or(format!("{}/.kube/config", user_home.display()));
+        cli.extend(
+            [
+                "docker",
+                "run",
+                "--interactive",
+                "--rm",
+                "--network",
+                "host",
+                "-v",
+                &format!("{}:/.kube/config", kube_config),
+                "--env",
+                "KUBECONFIG=/.kube/config",
+                KUBECTL_IMAGE,
+            ]
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>(),
+        );
+    } else {
+        cli.extend(
+            ["kubectl"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    cli.extend(
+        [
+            "create",
+            "configmap",
+            name,
+            "--namespace",
+            namespace,
+            "--dry-run=client",
+            "-o=yaml",
+            ">",
+            output_path,
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>(),
+    );
+
+    cli
 }
 
 /// Utility to generate the cleanup configmap name based on a given name.
@@ -168,10 +211,12 @@ pub fn post_pruning_script(app_instance: &AppInstance, docker: bool) -> Result<S
 
 /// Generates a shell script that is used as a helper during the cleanup process
 /// of the associated AppInstance.
-pub fn setup_script(app_instance: &AppInstance) -> Result<Script> {
+pub fn setup_script(app_instance: &AppInstance, output_path: &str, docker: bool) -> Result<Script> {
     let cleanup_helper = emit_deletion_setup(
         &cleanup_hack_resource_name(app_instance),
         &app_instance.namespace_any(),
+        output_path,
+        docker,
     );
     Ok(Script::from_vec(cleanup_helper))
 }
