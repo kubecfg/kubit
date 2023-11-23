@@ -14,6 +14,7 @@ pub enum Metadata {
     /// Retrieve the JSON schema for the package `spec`.
     Schema {
         app_instance: String,
+        #[clap(long)]
         skip_auth: bool,
     },
 
@@ -21,6 +22,7 @@ pub enum Metadata {
     /// It can be useful when using private mirror for air-gapped environments.
     Images {
         app_instance: String,
+        #[clap(long)]
         skip_auth: bool,
     },
 }
