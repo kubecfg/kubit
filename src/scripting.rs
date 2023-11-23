@@ -29,8 +29,8 @@ impl Script {
 fn quoted(src: &String) -> String {
     if src.starts_with("${") {
         format!(r#""{src}""#)
-    } else if src.starts_with(">") {
-        format!(r#"{src}"#)
+    } else if src.starts_with('>') {
+        src.to_string()
     } else {
         yash_quote::quoted(src).to_string()
     }
