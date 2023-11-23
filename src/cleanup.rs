@@ -114,7 +114,7 @@ pub fn emit_post_deletion_commandline(app_instance: &AppInstance, docker: bool) 
         [
             "delete",
             "configmap",
-            &configmap_name_for(app_instance.name_any()),
+            &cleanup_hack_resource_name(app_instance),
             "--namespace",
             &app_instance.namespace_any(),
         ]
@@ -142,8 +142,8 @@ pub fn emit_deletion_setup(ns: &str, output_file: &str) -> Vec<String> {
 }
 
 /// Utility to generate the cleanup configmap name based on a given name.
-pub fn configmap_name_for(name: String) -> String {
-    format!("{name}-cleanup")
+pub fn cleanup_hack_resource_name(app_instance: &AppInstance) -> String {
+    format!("{}-cleanup", app_instance.name_any())
 }
 
 /// Generates a shell script that will cleanup the created AppInstance resources.
