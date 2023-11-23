@@ -126,15 +126,21 @@ pub fn emit_post_deletion_commandline(app_instance: &AppInstance, docker: bool) 
     cli
 }
 
-pub fn emit_deletion_setup(ns: &str, output_file: &str) -> Vec<String> {
+/// Create a blank ConfigMap. This is used as a utility to help cleanup
+/// resources by leveraging the applyset functionality.
+///
+/// Unfortunately, we cannot use a blank object of kind `List` as the applyset
+/// requires that _some_ objects are passed to it.
+pub fn emit_deletion_setup(name: &str, namespace: &str) -> Vec<String> {
     [
-        "kubit",
-        "helper",
-        "cleanup",
+        "kubectl",
+        "create",
+        "configmap",
+        name,
         "--namespace",
-        ns,
-        "--output",
-        output_file,
+        namespace,
+        "--dry-run=client",
+        "-o=yaml",
     ]
     .iter()
     .map(|s| s.to_string())
@@ -162,7 +168,10 @@ pub fn post_pruning_script(app_instance: &AppInstance, docker: bool) -> Result<S
 
 /// Generates a shell script that is used as a helper during the cleanup process
 /// of the associated AppInstance.
-pub fn setup_script(app_instance: &AppInstance, deletion_dir: &str) -> Result<Script> {
-    let cleanup_helper = emit_deletion_setup(&app_instance.namespace_any(), deletion_dir);
+pub fn setup_script(app_instance: &AppInstance) -> Result<Script> {
+    let cleanup_helper = emit_deletion_setup(
+        &cleanup_hack_resource_name(app_instance),
+        &app_instance.namespace_any(),
+    );
     Ok(Script::from_vec(cleanup_helper))
 }
