@@ -1,9 +1,8 @@
 use assert_cmd::prelude::*;
 use k8s_openapi::api::core::v1::ConfigMap;
 use k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service};
-use kube::ResourceExt;
 use kube::{api::ListParams, client, Api};
-use kubit::cleanup::cleanup_hack_resource_name;
+use kubit::delete::cleanup_hack_resource_name;
 use kubit::resources::AppInstance;
 use std::fs::File;
 use std::process::Command;
@@ -20,7 +19,7 @@ async fn local_cleanup() {
 
     // Prune the applied resources.
     let mut cmd = Command::cargo_bin("kubit").unwrap();
-    let _ = cmd.args(["local", "cleanup", TEST_FILE]).unwrap();
+    let _ = cmd.args(["local", "delete", TEST_FILE]).unwrap();
 
     let file = File::open(TEST_FILE).unwrap();
     let app_instance: AppInstance = serde_yaml::from_reader(file).unwrap();

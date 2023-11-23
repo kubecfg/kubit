@@ -11,7 +11,7 @@ use tempfile::NamedTempFile;
 
 use crate::{
     apply::{self, KUBIT_APPLIER_FIELD_MANAGER},
-    cleanup, render,
+    delete, render,
     resources::AppInstance,
     scripting::Script,
 };
@@ -45,11 +45,11 @@ pub enum Local {
         package_image: Option<String>,
     },
 
-    /// Cleanup the resources created by a packaged AppInstance.
+    /// Delete the resources created by a packaged AppInstance.
     ///
     /// This removes all created resource, except the containing Namespace as it
     /// is created outside of an applyset.
-    Cleanup {
+    Delete {
         /// Path to the file containing a (YAML) AppInstance manifest.
         app_instance: String,
 
@@ -92,11 +92,11 @@ pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()>
             )
             .await?;
         }
-        Local::Cleanup {
+        Local::Delete {
             app_instance,
             docker,
             dry_run,
-        } => cleanup(app_instance, *docker, dry_run).await?,
+        } => delete(app_instance, *docker, dry_run).await?,
     };
     Ok(())
 }
@@ -290,7 +290,7 @@ async fn write_apply_script(
     Ok(())
 }
 
-async fn write_cleanup_script(
+async fn write_delete_script(
     app_instance: AppInstance,
     mut output: Box<dyn WriteClose>,
     docker: bool,
@@ -303,9 +303,8 @@ async fn write_cleanup_script(
     }
 
     steps.extend([
-        cleanup::setup_script(&app_instance, "/tmp/local-cleanup")?,
-        cleanup::script(&app_instance, "/tmp/local-cleanup", docker)?,
-        cleanup::post_pruning_script(&app_instance, docker)?,
+        delete::setup_script(&app_instance)? | delete::script(&app_instance, "-", docker)?,
+        delete::post_pruning_script(&app_instance, docker)?,
     ]);
 
     let script: Script = steps.into_iter().sum();
@@ -372,13 +371,13 @@ pub fn confirm_continue() -> bool {
     matches!(buffer[0], b'y' | b'Y')
 }
 
-pub async fn cleanup(app_instance: &str, docker: bool, dry_run: &Option<DryRun>) -> Result<()> {
+pub async fn delete(app_instance: &str, docker: bool, dry_run: &Option<DryRun>) -> Result<()> {
     let (output, path) = get_script(dry_run)?;
 
     let file = File::open(app_instance)?;
     let app_instance: AppInstance = serde_yaml::from_reader(file)?;
 
-    write_cleanup_script(app_instance, output, docker, path).await?;
+    write_delete_script(app_instance, output, docker, path).await?;
 
     Ok(())
 }

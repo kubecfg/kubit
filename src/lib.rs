@@ -59,7 +59,7 @@ pub mod controller;
 pub mod resources;
 
 pub mod apply;
-pub mod cleanup;
+pub mod delete;
 pub mod helpers;
 pub mod local;
 pub mod metadata;

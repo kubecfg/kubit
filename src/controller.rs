@@ -32,7 +32,7 @@ use oci_distribution::{secrets::RegistryAuth, Reference};
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    apply, cleanup,
+    apply, delete,
     docker_config::DockerConfig,
     oci::{self, PackageConfig},
     render,
@@ -138,7 +138,7 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
         |event| async {
             match event {
                 Finalizer::Apply(app_instance) => reconcile_apply(&app_instance, &ctx).await,
-                Finalizer::Cleanup(app_instance) => reconcile_cleanup(&app_instance, &ctx).await,
+                Finalizer::Cleanup(app_instance) => reconcile_delete(&app_instance, &ctx).await,
             }
         },
     )
@@ -240,7 +240,7 @@ async fn reconcile_apply(app_instance: &AppInstance, ctx: &Context) -> Result<Ac
     Ok(action)
 }
 
-async fn reconcile_cleanup(app_instance: &AppInstance, ctx: &Context) -> Result<Action> {
+async fn reconcile_delete(app_instance: &AppInstance, ctx: &Context) -> Result<Action> {
     info!(
         name = app_instance.name_any(),
         namespace = app_instance.namespace(),
@@ -370,17 +370,17 @@ async fn launch_cleanup_job(app_instance: &AppInstance, ctx: &Context) -> Result
                     volumes: Some(volumes),
                     init_containers: Some(vec![Container {
                         name: "setup-delete".to_string(),
-                        image: Some("index.docker.io/jdockerty/kubit-local:latest".to_string()), // TODO: update on release
-                        command: Some(cleanup::emit_deletion_setup(
+                        image: Some(ctx.kubit_image.clone()),
+                        command: Some(delete::emit_deletion_setup(
+                            &app_instance.name_any(),
                             &app_instance.namespace_any(),
-                            "/manifests/cm.json",
                         )),
                         ..container_defaults.clone()
                     }]),
                     containers: vec![Container {
                         name: "cleanup-manifests".to_string(),
                         image: Some(KUBECTL_IMAGE.to_string()),
-                        command: Some(cleanup::emit_commandline(
+                        command: Some(delete::emit_commandline(
                             app_instance,
                             "/manifests/cm.json",
                             false,
