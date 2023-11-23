@@ -7,8 +7,10 @@ use std::io::{stdout, IsTerminal, Read, Write};
 use std::os::unix::prelude::PermissionsExt;
 use std::path::PathBuf;
 use std::process::Command;
-use tempfile::NamedTempFile;
+use tempfile::{NamedTempFile, TempDir};
 
+use crate::delete::cleanup_hack_resource_name;
+use crate::Error;
 use crate::{
     apply::{self, KUBIT_APPLIER_FIELD_MANAGER},
     delete, render,
@@ -64,11 +66,22 @@ pub enum Local {
     },
 }
 
-#[derive(Clone, clap::ValueEnum)]
+#[derive(Clone, clap::ValueEnum, Debug)]
 pub enum DryRun {
     Render,
     Diff,
     Script,
+}
+
+impl std::fmt::Display for DryRun {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let dry_run = match self {
+            DryRun::Diff => "diff".to_string(),
+            DryRun::Script => "script".to_string(),
+            DryRun::Render => "render".to_string(),
+        };
+        write!(f, "{}", dry_run)
+    }
 }
 
 pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()> {
@@ -379,12 +392,19 @@ pub fn confirm_continue() -> bool {
 }
 
 pub async fn delete(app_instance: &str, docker: bool, dry_run: &Option<DryRun>) -> Result<()> {
-    let (output, path) = get_script(dry_run)?;
+    match dry_run {
+        Some(DryRun::Render | DryRun::Diff) => {
+            Err(Error::UnsupportedDryRunOption(dry_run.clone().unwrap()).into())
+        }
+        Some(DryRun::Script) | None => {
+            let (output, path) = get_script(dry_run)?;
 
-    let file = File::open(app_instance)?;
-    let app_instance: AppInstance = serde_yaml::from_reader(file)?;
+            let file = File::open(app_instance)?;
+            let app_instance: AppInstance = serde_yaml::from_reader(file)?;
 
-    write_delete_script(app_instance, output, docker, path).await?;
+            write_delete_script(app_instance, output, docker, path).await?;
 
-    Ok(())
+            Ok(())
+        }
+    }
 }

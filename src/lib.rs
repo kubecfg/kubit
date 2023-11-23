@@ -1,5 +1,7 @@
 #![deny(rustdoc::broken_intra_doc_links, rustdoc::bare_urls, rust_2018_idioms)]
 
+use local::DryRun;
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Kube Error: {0}")]
@@ -13,6 +15,9 @@ pub enum Error {
 
     #[error("Unsupported manifest type: Index")]
     UnsupportedManifestIndex,
+
+    #[error("Unsupported dry run option: {0}")]
+    UnsupportedDryRunOption(DryRun),
 
     #[error("Error decoding package config JSON: {0}")]
     DecodePackageConfig(serde_json::Error),
