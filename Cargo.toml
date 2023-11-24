@@ -1,6 +1,6 @@
 [package]
 name = "kubit"
-version = "0.0.11"
+version = "0.0.12"
 license = "MIT"
 edition = "2021"
 keywords = ["kubernetes"]
@@ -32,7 +32,7 @@ tynm = "0.1.9"
 itertools = "0.12.0"
 base64 = "0.21.5"
 assert_matches = "1.5.0"
-docker_credential = "1.2.0"
+docker_credential = "1.2.1"
 home = { version = "0.5.5", features = [] }
 
 [dev-dependencies]
