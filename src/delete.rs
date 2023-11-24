@@ -132,8 +132,7 @@ pub fn emit_post_deletion_commandline(app_instance: &AppInstance, docker: bool) 
 /// Unfortunately, we cannot use a blank object of kind `List` as the applyset
 /// requires that _some_ objects are passed to it.
 pub fn emit_deletion_setup(
-    name: &str,
-    namespace: &str,
+    app_instance: &AppInstance,
     output_path: &str,
     docker: bool,
 ) -> Vec<String> {
@@ -174,9 +173,9 @@ pub fn emit_deletion_setup(
         [
             "create",
             "configmap",
-            name,
+            &cleanup_hack_resource_name(app_instance),
             "--namespace",
-            namespace,
+            &app_instance.namespace_any(),
             "--dry-run=client",
             "-o=yaml",
             ">",
@@ -212,11 +211,6 @@ pub fn post_pruning_script(app_instance: &AppInstance, docker: bool) -> Result<S
 /// Generates a shell script that is used as a helper during the cleanup process
 /// of the associated AppInstance.
 pub fn setup_script(app_instance: &AppInstance, output_path: &str, docker: bool) -> Result<Script> {
-    let cleanup_helper = emit_deletion_setup(
-        &cleanup_hack_resource_name(app_instance),
-        &app_instance.namespace_any(),
-        output_path,
-        docker,
-    );
+    let cleanup_helper = emit_deletion_setup(app_instance, output_path, docker);
     Ok(Script::from_vec(cleanup_helper))
 }
