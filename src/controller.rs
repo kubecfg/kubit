@@ -4,7 +4,7 @@ use k8s_openapi::{
     api::{
         batch::v1::{Job, JobSpec},
         core::v1::{
-            Container, EnvVar, KeyToPath, Pod, PodSpec, PodTemplateSpec, Secret,
+            ConfigMap, Container, EnvVar, KeyToPath, Pod, PodSpec, PodTemplateSpec, Secret,
             SecretVolumeSource, ServiceAccount, Volume, VolumeMount,
         },
         rbac::v1::{PolicyRule, Role, RoleBinding, RoleRef, Subject},
@@ -273,11 +273,43 @@ async fn reconcile_delete(app_instance: &AppInstance, ctx: &Context) -> Result<A
         None => {
             info!("No Job found for {apply_job_name}, proceeding to cleanup phase");
             match jobs.get_opt(&cleanup_job_name).await? {
-                Some(_) => create_cleanup(app_instance, jobs, &cleanup_job_name, ctx).await,
-                None => Ok(Action::await_change()),
+                Some(_) => {
+                    create_cleanup(app_instance, jobs, &cleanup_job_name, ctx).await?;
+                    delete_cleanup_hack_configmap(app_instance, ctx).await
+                }
+                None => {
+                    delete_cleanup_hack_configmap(app_instance, ctx).await?;
+                    Ok(Action::await_change())
+                }
             }
         }
     }
+}
+
+/// Delete the ConfigMap that was used to prune the applyset.
+///
+/// This diverges slightly from the spawned Job with emit_<command> style
+/// that is used throughout the codebase, as the Job is marked as `Completed`.
+/// This is problematic because we cannot use a `PreStop` hook in order to
+/// run a `kubectl delete configmap` operation.
+///
+/// From the Kubernetes documentation:
+/// A call to the PreStop hook fails if the container is already in a terminated or completed
+/// state
+///
+/// For further details see
+/// <https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks>
+async fn delete_cleanup_hack_configmap(
+    app_instance: &AppInstance,
+    ctx: &Context,
+) -> Result<Action> {
+    let cm_api: Api<ConfigMap> = Api::namespaced(ctx.client.clone(), &app_instance.namespace_any());
+    let delete_params = DeleteParams::default();
+    let cm_name = &delete::cleanup_hack_resource_name(app_instance);
+    info!("Performing ConfigMap deletion on {cm_name} to finalise cleanup process.");
+    cm_api.delete(cm_name, &delete_params).await?;
+    info!("{cm_name} deleted");
+    Ok(Action::await_change())
 }
 
 async fn create_cleanup(
