@@ -261,7 +261,10 @@ async fn reconcile_delete(app_instance: &AppInstance, ctx: &Context) -> Result<A
 
             // Cleaning up the job can take some time and is an idempotent action, so we
             // can requeue if upon failure when an Err is returned.
-            if let Err(_) = tokio::time::timeout(Duration::from_secs(120), cond).await {
+            if tokio::time::timeout(Duration::from_secs(120), cond)
+                .await
+                .is_err()
+            {
                 Err(Error::ResourceDeletionTimeout)
             } else {
                 create_cleanup(app_instance, jobs, &cleanup_job_name, ctx).await
@@ -290,7 +293,10 @@ async fn create_cleanup(
 
     let cond = await_condition(jobs, job_name, is_job_completed());
     info!("Awaiting completion of {job_name}");
-    if let Err(_) = tokio::time::timeout(Duration::from_secs(120), cond).await {
+    if tokio::time::timeout(Duration::from_secs(120), cond)
+        .await
+        .is_err()
+    {
         Err(Error::ResourceDeletionTimeout)
     } else {
         info!("{job_name} deleted");
