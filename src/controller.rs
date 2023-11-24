@@ -258,18 +258,21 @@ async fn reconcile_delete(app_instance: &AppInstance, ctx: &Context) -> Result<A
             info!("Awaiting termination of {apply_job_name}");
             let job_uid = apply_job.uid().unwrap();
             let cond = await_condition(jobs.clone(), &apply_job_name, is_deleted(&job_uid));
+
             // Cleaning up the job can take some time and is an idempotent action, so we
-            // can requeue if upon failure.
-            if let Err(e) = tokio::time::timeout(Duration::from_secs(60), cond).await {
-                error!("Unable to delete resource, requeuing: {}", e);
-                Ok(Action::requeue(Duration::from_secs(5)))
+            // can requeue if upon failure when an Err is returned.
+            if let Err(_) = tokio::time::timeout(Duration::from_secs(120), cond).await {
+                Err(Error::ResourceDeletionTimeout)
             } else {
                 create_cleanup(app_instance, jobs, &cleanup_job_name, ctx).await
             }
         }
         None => {
-            info!("No Job found for {apply_job_name}, proceeding to cleanup");
-            create_cleanup(app_instance, jobs, &cleanup_job_name, ctx).await
+            info!("No Job found for {apply_job_name}, proceeding to cleanup phase");
+            match jobs.get_opt(&cleanup_job_name).await? {
+                Some(_) => create_cleanup(app_instance, jobs, &cleanup_job_name, ctx).await,
+                None => Ok(Action::await_change()),
+            }
         }
     }
 }
@@ -287,9 +290,8 @@ async fn create_cleanup(
 
     let cond = await_condition(jobs, job_name, is_job_completed());
     info!("Awaiting completion of {job_name}");
-    if let Err(e) = tokio::time::timeout(Duration::from_secs(120), cond).await {
-        error!("Deletion did not complete in time, requeuing: {}", e);
-        Ok(Action::requeue(Duration::from_secs(5)))
+    if let Err(_) = tokio::time::timeout(Duration::from_secs(120), cond).await {
+        Err(Error::ResourceDeletionTimeout)
     } else {
         info!("{job_name} deleted");
         Ok(Action::await_change())
@@ -377,8 +379,7 @@ async fn launch_cleanup_job(app_instance: &AppInstance, ctx: &Context) -> Result
                         args: Some(vec![
                             "-c".to_string(),
                             delete::emit_deletion_setup(
-                                &app_instance.name_any(),
-                                &app_instance.namespace_any(),
+                                app_instance,
                                 &format!(
                                     "/manifests/cm-{}",
                                     delete::cleanup_hack_resource_name(app_instance)

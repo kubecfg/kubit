@@ -53,6 +53,9 @@ pub enum Error {
     // NB: awkward type because finalizer::Error embeds the reconciler error (which is this)
     // so boxing this error to break cycles
     FinalizerError(#[source] Box<kube::runtime::finalizer::Error<Error>>),
+
+    #[error("Timeout elapsed before object could be deleted, retrying")]
+    ResourceDeletionTimeout,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
