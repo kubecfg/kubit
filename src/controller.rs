@@ -370,16 +370,23 @@ async fn launch_cleanup_job(app_instance: &AppInstance, ctx: &Context) -> Result
                     volumes: Some(volumes),
                     init_containers: Some(vec![Container {
                         name: "setup-delete".to_string(),
-                        image: Some(ctx.kubit_image.clone()),
-                        command: Some(delete::emit_deletion_setup(
-                            &app_instance.name_any(),
-                            &app_instance.namespace_any(),
-                            &format!(
-                                "/manifests/cm-{}",
-                                delete::cleanup_hack_resource_name(app_instance)
-                            ),
-                            false,
-                        )),
+                        // We need to use the bitnami image to make use of the in built
+                        // shell to use the stdout redirection into a file.
+                        image: Some(apply::KUBECTL_IMAGE.to_string()),
+                        command: Some(vec!["/bin/sh".to_string()]),
+                        args: Some(vec![
+                            "-c".to_string(),
+                            delete::emit_deletion_setup(
+                                &app_instance.name_any(),
+                                &app_instance.namespace_any(),
+                                &format!(
+                                    "/manifests/cm-{}",
+                                    delete::cleanup_hack_resource_name(app_instance)
+                                ),
+                                false,
+                            )
+                            .join(" "),
+                        ]),
                         ..container_defaults.clone()
                     }]),
                     containers: vec![Container {
