@@ -250,39 +250,34 @@ async fn reconcile_delete(app_instance: &AppInstance, ctx: &Context) -> Result<A
     let apply_job_name = job_name_for(app_instance, "apply");
     let cleanup_job_name = job_name_for(app_instance, "cleanup");
 
-    match jobs.get_opt(&apply_job_name).await? {
-        Some(apply_job) => {
-            info!("Deleting the running job");
-            delete_job(app_instance, ctx).await?;
+    if let Some(apply_job) = jobs.get_opt(&apply_job_name).await? {
+        info!("Deleting the running job");
+        delete_job(app_instance, ctx).await?;
 
-            info!("Awaiting termination of {apply_job_name}");
-            let job_uid = apply_job.uid().unwrap();
-            let cond = await_condition(jobs.clone(), &apply_job_name, is_deleted(&job_uid));
+        info!("Awaiting termination of {apply_job_name}");
+        let job_uid = apply_job.uid().unwrap();
+        let cond = await_condition(jobs.clone(), &apply_job_name, is_deleted(&job_uid));
 
-            // Cleaning up the job can take some time and is an idempotent action, so we
-            // can requeue if upon failure when an Err is returned.
-            if tokio::time::timeout(Duration::from_secs(120), cond)
-                .await
-                .is_err()
-            {
-                Err(Error::ResourceDeletionTimeout)
-            } else {
-                create_cleanup(app_instance, jobs, &cleanup_job_name, ctx).await
-            }
+        // Cleaning up the job can take some time and is an idempotent action, so we
+        // can requeue if upon failure when an Err is returned.
+        if tokio::time::timeout(Duration::from_secs(120), cond)
+            .await
+            .is_err()
+        {
+            return Err(Error::ResourceDeletionTimeout);
+        } else {
+            create_cleanup(app_instance, jobs, &cleanup_job_name, ctx).await?;
+            return delete_cleanup_hack_configmap(app_instance, ctx).await;
         }
-        None => {
-            info!("No Job found for {apply_job_name}, proceeding to cleanup phase");
-            match jobs.get_opt(&cleanup_job_name).await? {
-                Some(_) => {
-                    create_cleanup(app_instance, jobs, &cleanup_job_name, ctx).await?;
-                    delete_cleanup_hack_configmap(app_instance, ctx).await
-                }
-                None => {
-                    delete_cleanup_hack_configmap(app_instance, ctx).await?;
-                    Ok(Action::await_change())
-                }
-            }
+    }
+
+    info!("No Job found for {apply_job_name}, proceeding to cleanup phase");
+    match jobs.get_opt(&cleanup_job_name).await? {
+        Some(_) => {
+            create_cleanup(app_instance, jobs, &cleanup_job_name, ctx).await?;
+            delete_cleanup_hack_configmap(app_instance, ctx).await
         }
+        None => delete_cleanup_hack_configmap(app_instance, ctx).await,
     }
 }
 
