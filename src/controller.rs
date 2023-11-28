@@ -17,6 +17,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use kube::{
     api::{DeleteParams, ListParams, LogParams, Patch, PatchParams, PostParams, PropagationPolicy},
     core::ObjectMeta,
+    error::ErrorResponse,
     runtime::{
         conditions::{is_deleted, is_job_completed, Condition},
         controller::{Action, Controller},
@@ -302,7 +303,17 @@ async fn delete_cleanup_hack_configmap(
     let delete_params = DeleteParams::default();
     let cm_name = &delete::cleanup_hack_resource_name(app_instance);
     info!("Performing ConfigMap deletion on {cm_name} to finalise cleanup process.");
-    cm_api.delete(cm_name, &delete_params).await?;
+    cm_api
+        .delete(cm_name, &delete_params)
+        .await
+        .map(|_| ())
+        .or_else(|err| match err {
+            // ConfigMap has already been deleted or does not exist, so there
+            // is nothing to delete.
+            kube::Error::Api(ErrorResponse { code: 404, .. }) => Ok(()),
+            _ => Err(err),
+        })
+        .map_err(Error::KubeError)?;
     info!("{cm_name} deleted");
     Ok(Action::await_change())
 }
