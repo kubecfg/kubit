@@ -7,9 +7,9 @@ namespace: influxdb
 resources:
   - ../crd
   - ../namespace
-  - ../manager
+  #- ../manager
   - ../rbac
 
 patches:
-  - path: manager.yaml
+  #- path: manager.yaml
   - path: role_binding.yaml

@@ -34,6 +34,11 @@ impl AppInstance {
     }
 }
 
+pub enum AppInstanceLikeResources {
+    AppInstance,
+    ConfigMap,
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Package {

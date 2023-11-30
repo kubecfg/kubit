@@ -202,6 +202,22 @@ pub fn emit_fetch_app_instance_commandline(ns: &str, name: &str, output_file: &s
     .collect::<Vec<_>>()
 }
 
+pub fn emit_fetch_config_map_commandline(ns: &str, name: &str, output_file: &str) -> Vec<String> {
+    [
+        "kubit",
+        "helper",
+        "fetch-config-map",
+        "--namespace",
+        ns,
+        "--output",
+        output_file,
+        name,
+    ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>()
+}
+
 #[cfg(test)]
 mod tests {
 
