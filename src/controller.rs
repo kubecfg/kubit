@@ -258,13 +258,13 @@ enum JobOutcome {
 
 pub struct AppInstanceLike {
     pub instance: Arc<AppInstance>,
-    resource: AppInstanceLikeResources,
+    original: AppInstanceLikeResources,
 }
 
 impl From<Arc<AppInstance>> for AppInstanceLike {
     fn from(value: Arc<AppInstance>) -> Self {
         Self {
-            resource: AppInstanceLikeResources::AppInstance,
+            original: AppInstanceLikeResources::AppInstance(value.clone()),
             instance: value,
         }
     }
@@ -279,7 +279,7 @@ impl AppInstanceLike {
             return ai.map(|mut x| {
                 x.metadata.uid = config_map.metadata.uid.clone();
                 Self {
-                    resource: AppInstanceLikeResources::ConfigMap,
+                    original: AppInstanceLikeResources::ConfigMap(config_map),
                     instance: Arc::new(x),
                 }
             }
@@ -486,8 +486,16 @@ impl AppInstanceLike {
 
 
     fn owned_by(&self) -> Option<Vec<OwnerReference>> {
-        println!("{:?}", self.instance.controller_owner_ref(&()));
-        self.instance.controller_owner_ref(&()).map(|o| vec![o])
+        match &self.original {
+            AppInstanceLikeResources::AppInstance(v) => {
+                v.controller_owner_ref(&()).map(|o| vec![o])
+            }
+            AppInstanceLikeResources::ConfigMap(v) => {
+                v.controller_owner_ref(&()).map(|o| vec![o])
+            }
+        }
+        //println!("{:?}", self.instance.controller_owner_ref(&()));
+        //self.instance.controller_owner_ref(&()).map(|o| vec![o])
     }
 
 
@@ -660,7 +668,7 @@ impl AppInstanceLike {
             metadata: ObjectMeta {
                 name: Some(job_name),
                 namespace: self.instance.namespace().clone(),
-                owner_references: None, //self.owned_by(),
+                owner_references: self.owned_by(),
                 ..Default::default()
             },
             spec: Some(JobSpec {
@@ -833,8 +841,8 @@ impl AppInstanceLike {
     }
 
     async fn old_status(&self, ns: &str, ctx: &Context) -> Result<AppInstanceStatus> {
-        match self.resource {
-            AppInstanceLikeResources::AppInstance => {
+        match self.original {
+            AppInstanceLikeResources::AppInstance(_) => {
                 let api: Api<AppInstance> = Api::namespaced(ctx.client.clone(), ns);
                 Ok(api
                     .get_status(&self.instance.name_any())
@@ -843,7 +851,7 @@ impl AppInstanceLike {
                     .clone()
                     .unwrap_or_default())
             }
-            AppInstanceLikeResources::ConfigMap => {
+            AppInstanceLikeResources::ConfigMap(_) => {
                 let api: Api<ConfigMap> = Api::namespaced(ctx.client.clone(), ns);
                 let data = api
                     .get(&self.instance.name_any())
@@ -880,8 +888,8 @@ impl AppInstanceLike {
     ) -> Result<()> {
         let ns = &self.instance.namespace().ok_or(Error::NamespaceRequired)?;
 
-        match self.resource {
-            AppInstanceLikeResources::AppInstance => {
+        match self.original {
+            AppInstanceLikeResources::AppInstance(_) => {
                 let app_instance_api: Api<AppInstance> = Api::namespaced(ctx.client.clone(), ns);
 
                 let app_instance_patch = AppInstance {
@@ -897,7 +905,7 @@ impl AppInstanceLike {
                     )
                     .await?;
             }
-            AppInstanceLikeResources::ConfigMap => {
+            AppInstanceLikeResources::ConfigMap(_) => {
                 let config_map_api: Api<ConfigMap> = Api::namespaced(ctx.client.clone(), ns);
                 let status_string = serde_json::to_string(&status).map_err(|_| Error::NamespaceRequired)?; // TODO: Better error here
                 let patch = serde_json::json!({
@@ -919,15 +927,15 @@ impl AppInstanceLike {
         Ok(())
     }
     async fn init_containers(&self, ns: &str, kubecfg_image: &str, container_defaults: &Container, ctx: &Context) -> Vec<Container> {
-        let (command, name) = match self.resource {
-            AppInstanceLikeResources::AppInstance => {
+        let (command, name) = match self.original {
+            AppInstanceLikeResources::AppInstance(_) => {
                 (render::emit_fetch_app_instance_commandline(
                     ns,
                     &self.instance.name_any(),
                     "/overlay/appinstance.json",
                 ), "fetch-app-instance")
             }
-            AppInstanceLikeResources::ConfigMap => {
+            AppInstanceLikeResources::ConfigMap(_) => {
                 (render::emit_fetch_config_map_commandline(
                     ns,
                     &self.instance.name_any(),

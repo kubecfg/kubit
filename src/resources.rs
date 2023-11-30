@@ -1,19 +1,21 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use k8s_openapi::{api::core::v1::LocalObjectReference, apimachinery::pkg::apis::meta::v1::Time};
+use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{CustomResource, ResourceExt};
 use schemars::{
-    schema::{Schema, SchemaObject},
     JsonSchema,
+    schema::{Schema, SchemaObject},
 };
 use serde::{Deserialize, Serialize};
 
 #[derive(CustomResource, Debug, Serialize, Deserialize, Default, Clone, JsonSchema)]
 #[kube(
-    group = "kubecfg.dev",
-    version = "v1alpha1",
-    kind = "AppInstance",
-    namespaced
+group = "kubecfg.dev",
+version = "v1alpha1",
+kind = "AppInstance",
+namespaced
 )]
 #[kube(status = "AppInstanceStatus")]
 #[serde(rename_all = "camelCase")]
@@ -35,8 +37,8 @@ impl AppInstance {
 }
 
 pub enum AppInstanceLikeResources {
-    AppInstance,
-    ConfigMap,
+    AppInstance(Arc<AppInstance>),
+    ConfigMap(Arc<ConfigMap>),
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
