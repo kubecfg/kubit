@@ -67,7 +67,7 @@ impl DockerCredentials {
             DockerCredentials::Split { username, password } => (username, password),
 
             DockerCredentials::Composite { auth } => {
-                String::from_utf8(general_purpose::STANDARD.decode(auth)?)?
+                String::from_utf8(general_purpose::URL_SAFE.decode(auth)?)?
                     .split_once(':')
                     .map(|(a, b)| (a.to_string(), b.to_string()))
                     .ok_or(Error::MissingColon)?
