@@ -2,6 +2,7 @@ use base64::{engine::general_purpose, Engine as _};
 use oci_distribution::secrets::RegistryAuth;
 use serde::Deserialize;
 use std::collections::HashMap;
+use tracing::info;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -67,7 +68,14 @@ impl DockerCredentials {
             DockerCredentials::Split { username, password } => (username, password),
 
             DockerCredentials::Composite { auth } => {
-                String::from_utf8(general_purpose::STANDARD_NO_PAD.decode(auth)?)?
+                let decoded_auth =
+                    general_purpose::STANDARD_NO_PAD
+                        .decode(&auth)
+                        .or_else(|_| {
+                            info!("Attempting fallback decoding");
+                            general_purpose::STANDARD.decode(&auth)
+                        })?;
+                String::from_utf8(decoded_auth)?
                     .split_once(':')
                     .map(|(a, b)| (a.to_string(), b.to_string()))
                     .ok_or(Error::MissingColon)?
