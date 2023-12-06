@@ -132,6 +132,26 @@ mod tests {
     }
 
     #[test]
+    fn with_auth_padding_url_safe() {
+        let src = r#"
+        {
+            "auths": {
+                "us-docker.pkg.dev": {
+                    "auth": "YUQ6QXV-Ukw="
+                }
+            }
+        }
+        "#;
+
+        let config = DockerConfig::from_str(src).expect("no errors");
+        let auth = config.get_auth("us-docker.pkg.dev").expect("no errors");
+        assert_matches!(auth, RegistryAuth::Basic(username, password) if username == "aD" && password == "Au~RL");
+
+        let auth = config.get_auth("bitnami/kubectl").expect("no errors");
+        assert_matches!(auth, RegistryAuth::Anonymous);
+    }
+
+    #[test]
     fn other_fields() {
         let src = r#"
         {
