@@ -67,7 +67,7 @@ impl DockerCredentials {
             DockerCredentials::Split { username, password } => (username, password),
 
             DockerCredentials::Composite { auth } => {
-                String::from_utf8(general_purpose::URL_SAFE.decode(auth)?)?
+                String::from_utf8(general_purpose::STANDARD.decode(auth)?)?
                     .split_once(':')
                     .map(|(a, b)| (a.to_string(), b.to_string()))
                     .ok_or(Error::MissingColon)?
@@ -132,12 +132,12 @@ mod tests {
     }
 
     #[test]
-    fn with_auth_padding_url_safe() {
+    fn with_auth_padding() {
         let src = r#"
         {
             "auths": {
                 "us-docker.pkg.dev": {
-                    "auth": "YUQ6QXV-Ukw="
+                    "auth": "IWw+aFk6LWtHUS1xWg=="
                 }
             }
         }
@@ -145,7 +145,7 @@ mod tests {
 
         let config = DockerConfig::from_str(src).expect("no errors");
         let auth = config.get_auth("us-docker.pkg.dev").expect("no errors");
-        assert_matches!(auth, RegistryAuth::Basic(username, password) if username == "aD" && password == "Au~RL");
+        assert_matches!(auth, RegistryAuth::Basic(username, password) if username == "!l>hY" && password == "-kGQ-qZ");
 
         let auth = config.get_auth("bitnami/kubectl").expect("no errors");
         assert_matches!(auth, RegistryAuth::Anonymous);
