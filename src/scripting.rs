@@ -24,10 +24,13 @@ impl Script {
     }
 }
 
-// Quote all strings expect for explicit bash variable references
+// Quote all strings expect for explicit bash variable references and
+// redirection.
 fn quoted(src: &String) -> String {
     if src.starts_with("${") {
         format!(r#""{src}""#)
+    } else if src.starts_with('>') {
+        src.to_string()
     } else {
         yash_quote::quoted(src).to_string()
     }
@@ -178,5 +181,36 @@ echo \
 | wc \
     -c"#;
         assert_eq!(format!("{script}"), expected);
+    }
+
+    #[test]
+    fn test_redirect() {
+        let script = Script::from_vec(
+            ["echo", "foobar", ">", "/tmp/test"]
+                .into_iter()
+                .map(|x| x.to_string())
+                .collect(),
+        );
+        let expected = r#"#!/bin/bash
+set -euo pipefail
+
+echo \
+    foobar \
+    > \
+    /tmp/test"#;
+        assert_eq!(format!("{script}"), expected);
+    }
+
+    #[test]
+    fn test_quoted() {
+        let tests = [
+            (&String::from("${MY_VAR}"), format!("\"{}\"", "${MY_VAR}")),
+            (&String::from(">"), ">".to_string()),
+            (&String::from("hello"), "hello".to_string()),
+        ];
+
+        for (input, expected) in tests {
+            assert_eq!(quoted(input), expected);
+        }
     }
 }

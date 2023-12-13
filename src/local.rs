@@ -7,11 +7,13 @@ use std::io::{stdout, IsTerminal, Read, Write};
 use std::os::unix::prelude::PermissionsExt;
 use std::path::PathBuf;
 use std::process::Command;
-use tempfile::NamedTempFile;
+use tempfile::{NamedTempFile, TempDir};
 
+use crate::delete::cleanup_hack_resource_name;
+use crate::Error;
 use crate::{
     apply::{self, KUBIT_APPLIER_FIELD_MANAGER},
-    render,
+    delete, render,
     resources::AppInstance,
     scripting::Script,
 };
@@ -44,13 +46,42 @@ pub enum Local {
         #[clap(long)]
         package_image: Option<String>,
     },
+
+    /// Delete the resources created by a packaged AppInstance.
+    ///
+    /// This removes all created resource, except the containing Namespace as it
+    /// is created outside of an applyset.
+    Delete {
+        /// Path to the file containing a (YAML) AppInstance manifest.
+        app_instance: String,
+
+        /// Dry run
+        #[clap(long)]
+        dry_run: Option<DryRun>,
+
+        /// Use Docker containers for dependencies, rather than relying on locally installed
+        /// versions.
+        #[clap(long, default_value = "false")]
+        docker: bool,
+    },
 }
 
-#[derive(Clone, clap::ValueEnum)]
+#[derive(Clone, clap::ValueEnum, Debug)]
 pub enum DryRun {
     Render,
     Diff,
     Script,
+}
+
+impl std::fmt::Display for DryRun {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let dry_run = match self {
+            DryRun::Diff => "diff".to_string(),
+            DryRun::Script => "script".to_string(),
+            DryRun::Render => "render".to_string(),
+        };
+        write!(f, "{}", dry_run)
+    }
 }
 
 pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()> {
@@ -74,6 +105,11 @@ pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()>
             )
             .await?;
         }
+        Local::Delete {
+            app_instance,
+            docker,
+            dry_run,
+        } => delete(app_instance, *docker, dry_run).await?,
     };
     Ok(())
 }
@@ -164,7 +200,7 @@ pub async fn apply(
         }
     }
 
-    write_script(
+    write_apply_script(
         app_instance,
         overlay_file_name,
         output,
@@ -226,7 +262,7 @@ fn get_script(dry_run: &Option<DryRun>) -> io::Result<(Box<dyn WriteClose>, Opti
 
 // TODO(jdockerty): refactor args to avoid a huge number of inputs.
 #[allow(clippy::too_many_arguments)]
-async fn write_script(
+async fn write_apply_script(
     app_instance: AppInstance,
     overlay_file_name: &str,
     mut output: Box<dyn WriteClose>,
@@ -267,6 +303,44 @@ async fn write_script(
     Ok(())
 }
 
+async fn write_delete_script(
+    app_instance: AppInstance,
+    mut output: Box<dyn WriteClose>,
+    docker: bool,
+    path: Option<PathBuf>,
+) -> Result<()> {
+    let mut steps: Vec<Script> = vec![];
+    let tmp_dir = TempDir::new().unwrap();
+    let output_path = &format!(
+        "{}/{}",
+        tmp_dir.path().display(),
+        cleanup_hack_resource_name(&app_instance)
+    );
+
+    if !docker {
+        steps.extend([Script::from_str("export KUBECTL_APPLYSET=true")]);
+    }
+
+    steps.extend([
+        delete::setup_script(&app_instance, output_path, docker)?,
+        delete::script(&app_instance, output_path, docker)?,
+        delete::post_pruning_script(&app_instance, docker)?,
+    ]);
+
+    let script: Script = steps.into_iter().sum();
+
+    writeln!(output, "{script}")?;
+
+    // close the file but don't delete it until _deferred_delete_handle local var is in scope.
+    let _deferred_delete_handle = output.close()?;
+
+    if let Some(path) = path {
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755))?;
+        Command::new(path).status()?;
+    }
+    Ok(())
+}
+
 async fn prediff(
     overlay_file_name: &str,
     dry_run: &Option<DryRun>,
@@ -284,7 +358,7 @@ async fn prediff(
         app_instance.spec.package.image = package_image.clone();
     }
 
-    write_script(
+    write_apply_script(
         app_instance,
         overlay_file_name,
         output,
@@ -315,4 +389,22 @@ pub fn confirm_continue() -> bool {
     let mut buffer = [0; 1];
     std::io::stdin().read_exact(&mut buffer).unwrap();
     matches!(buffer[0], b'y' | b'Y')
+}
+
+pub async fn delete(app_instance: &str, docker: bool, dry_run: &Option<DryRun>) -> Result<()> {
+    match dry_run {
+        Some(DryRun::Render | DryRun::Diff) => {
+            Err(Error::UnsupportedDryRunOption(dry_run.clone().unwrap()).into())
+        }
+        Some(DryRun::Script) | None => {
+            let (output, path) = get_script(dry_run)?;
+
+            let file = File::open(app_instance)?;
+            let app_instance: AppInstance = serde_yaml::from_reader(file)?;
+
+            write_delete_script(app_instance, output, docker, path).await?;
+
+            Ok(())
+        }
+    }
 }

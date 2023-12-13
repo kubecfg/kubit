@@ -10,5 +10,3 @@ spec:
     spec:
       foo: 'bar'
       baz: 'qux'
-  imagePullSecrets:
-    - name: gar-docker-secret

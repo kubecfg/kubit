@@ -4,7 +4,7 @@ use k8s_openapi::{
     api::{
         batch::v1::{Job, JobSpec},
         core::v1::{
-            Container, EnvVar, KeyToPath, Pod, PodSpec, PodTemplateSpec, Secret,
+            ConfigMap, Container, EnvVar, KeyToPath, Pod, PodSpec, PodTemplateSpec, Secret,
             SecretVolumeSource, ServiceAccount, Volume, VolumeMount,
         },
         rbac::v1::{PolicyRule, Role, RoleBinding, RoleRef, Subject},
@@ -17,9 +17,12 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use kube::{
     api::{DeleteParams, ListParams, LogParams, Patch, PatchParams, PostParams, PropagationPolicy},
     core::ObjectMeta,
+    error::ErrorResponse,
     runtime::{
-        conditions::{is_job_completed, Condition},
+        conditions::{is_deleted, is_job_completed, Condition},
         controller::{Action, Controller},
+        finalizer::{finalizer, Event as Finalizer},
+        wait::await_condition,
         watcher,
     },
     Api, Client, Resource, ResourceExt,
@@ -30,7 +33,7 @@ use oci_distribution::{secrets::RegistryAuth, Reference};
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    apply,
+    apply, delete,
     docker_config::DockerConfig,
     oci::{self, PackageConfig},
     render,
@@ -41,6 +44,8 @@ use crate::{
 const KUBECTL_IMAGE: &str = "registry.k8s.io/kubectl:v1.28.0";
 
 const APPLIER_SERVICE_ACCOUNT: &str = "kubit-applier";
+
+const KUBIT_FINALIZER: &str = "kubecfg.dev/appinstance-cleanup";
 
 struct Context {
     client: Client,
@@ -125,7 +130,25 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
         return Ok(Action::await_change());
     }
 
-    let state = reconciliation_state(&app_instance, &ctx).await?;
+    let app_instance_api: Api<AppInstance> =
+        Api::namespaced(ctx.client.clone(), &app_instance.namespace_any());
+    finalizer(
+        &app_instance_api,
+        KUBIT_FINALIZER,
+        app_instance,
+        |event| async {
+            match event {
+                Finalizer::Apply(app_instance) => reconcile_apply(&app_instance, &ctx).await,
+                Finalizer::Cleanup(app_instance) => reconcile_delete(&app_instance, &ctx).await,
+            }
+        },
+    )
+    .await
+    .map_err(|e| Error::FinalizerError(Box::new(e)))
+}
+
+async fn reconcile_apply(app_instance: &AppInstance, ctx: &Context) -> Result<Action> {
+    let state = reconciliation_state(app_instance, ctx).await?;
     info!(?state);
 
     // We have two status conditions
@@ -138,11 +161,11 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
 
     let action = match state {
         ReconciliationState::Idle => {
-            match launch_job(&app_instance, &ctx).await {
+            match launch_job(app_instance, ctx).await {
                 Ok(()) => {
                     update_condition(
-                        &app_instance,
-                        &ctx,
+                        app_instance,
+                        ctx,
                         "Reconcilier",
                         "False",
                         "ExpandingTemplate",
@@ -151,12 +174,12 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
                     .await?;
                 }
                 Err(err) => {
-                    update_condition(&app_instance, &ctx, "Reconcilier", "False", "Failed", None)
+                    update_condition(app_instance, ctx, "Reconcilier", "False", "Failed", None)
                         .await?;
 
                     update_condition(
-                        &app_instance,
-                        &ctx,
+                        app_instance,
+                        ctx,
                         "Ready",
                         "False",
                         "Failed",
@@ -170,29 +193,22 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
         }
         ReconciliationState::Executing => {
             info!(
-                job_name = job_name_for(&app_instance),
+                job_name = job_name_for(app_instance, "apply"),
                 "waiting for applier job execution"
             );
             Action::await_change()
         }
         ReconciliationState::JobTerminated(job_uid, outcome) => {
-            let log_summary = capture_logs(&app_instance, &ctx, job_uid).await?;
+            let log_summary = capture_logs(app_instance, ctx, job_uid).await?;
 
             let action = match outcome {
                 JobOutcome::Success => {
                     info!("job completed successfully");
+                    update_condition(app_instance, ctx, "Reconcilier", "True", "Succeeded", None)
+                        .await?;
                     update_condition(
-                        &app_instance,
-                        &ctx,
-                        "Reconcilier",
-                        "True",
-                        "Succeeded",
-                        None,
-                    )
-                    .await?;
-                    update_condition(
-                        &app_instance,
-                        &ctx,
+                        app_instance,
+                        ctx,
                         "Ready",
                         "True",
                         "JobCompletedSuccessfully",
@@ -203,11 +219,11 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
                 }
                 JobOutcome::Failure => {
                     info!("job failed");
-                    update_condition(&app_instance, &ctx, "Reconcilier", "True", "Failed", None)
+                    update_condition(app_instance, ctx, "Reconcilier", "True", "Failed", None)
                         .await?;
                     update_condition(
-                        &app_instance,
-                        &ctx,
+                        app_instance,
+                        ctx,
                         "Ready",
                         "False",
                         "JobFailed",
@@ -217,12 +233,233 @@ async fn reconcile(app_instance: Arc<AppInstance>, ctx: Arc<Context>) -> Result<
                     Action::requeue(Duration::from_secs(60))
                 }
             };
-            delete_job(&app_instance, &ctx).await?;
+            delete_job(app_instance, ctx).await?;
             action
         }
     };
 
     Ok(action)
+}
+
+async fn reconcile_delete(app_instance: &AppInstance, ctx: &Context) -> Result<Action> {
+    info!(
+        name = app_instance.name_any(),
+        namespace = app_instance.namespace(),
+        "Cleaning up!"
+    );
+    let jobs: Api<Job> = Api::namespaced(ctx.client.clone(), &app_instance.namespace_any());
+    let apply_job_name = job_name_for(app_instance, "apply");
+    let cleanup_job_name = job_name_for(app_instance, "cleanup");
+
+    if let Some(apply_job) = jobs.get_opt(&apply_job_name).await? {
+        info!("Deleting the running job");
+        delete_job(app_instance, ctx).await?;
+
+        info!("Awaiting termination of {apply_job_name}");
+        let job_uid = apply_job.uid().unwrap();
+        let cond = await_condition(jobs.clone(), &apply_job_name, is_deleted(&job_uid));
+
+        // Cleaning up the job can take some time and is an idempotent action, so we
+        // can requeue if upon failure when an Err is returned.
+        if tokio::time::timeout(Duration::from_secs(120), cond)
+            .await
+            .is_err()
+        {
+            return Err(Error::ResourceDeletionTimeout);
+        } else {
+            create_cleanup(app_instance, jobs, &cleanup_job_name, ctx).await?;
+            return delete_cleanup_hack_configmap(app_instance, ctx).await;
+        }
+    }
+
+    info!("No Job found for {apply_job_name}, proceeding to cleanup phase");
+    match jobs.get_opt(&cleanup_job_name).await? {
+        Some(_) => {
+            create_cleanup(app_instance, jobs, &cleanup_job_name, ctx).await?;
+            delete_cleanup_hack_configmap(app_instance, ctx).await
+        }
+        None => delete_cleanup_hack_configmap(app_instance, ctx).await,
+    }
+}
+
+/// Delete the ConfigMap that was used to prune the applyset.
+///
+/// This diverges slightly from the spawned Job with emit_<command> style
+/// that is used throughout the codebase, as the Job is marked as `Completed`.
+/// This is problematic because we cannot use a `PreStop` hook in order to
+/// run a `kubectl delete configmap` operation.
+///
+/// From the Kubernetes documentation:
+/// A call to the PreStop hook fails if the container is already in a terminated or completed
+/// state
+///
+/// For further details see
+/// <https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks>
+async fn delete_cleanup_hack_configmap(
+    app_instance: &AppInstance,
+    ctx: &Context,
+) -> Result<Action> {
+    let cm_api: Api<ConfigMap> = Api::namespaced(ctx.client.clone(), &app_instance.namespace_any());
+    let delete_params = DeleteParams::default();
+    let cm_name = &delete::cleanup_hack_resource_name(app_instance);
+    info!("Performing ConfigMap deletion on {cm_name} to finalise cleanup process.");
+    cm_api
+        .delete(cm_name, &delete_params)
+        .await
+        .map(|_| ())
+        .or_else(|err| match err {
+            // ConfigMap has already been deleted or does not exist, so there
+            // is nothing to delete.
+            kube::Error::Api(ErrorResponse { code: 404, .. }) => Ok(()),
+            _ => Err(err),
+        })
+        .map_err(Error::KubeError)?;
+    info!("{cm_name} deleted");
+    Ok(Action::await_change())
+}
+
+async fn create_cleanup(
+    app_instance: &AppInstance,
+    jobs: Api<Job>,
+    job_name: &str,
+    ctx: &Context,
+) -> Result<Action> {
+    info!("Setting up RBAC");
+    setup_job_rbac(app_instance, ctx).await?;
+    info!("Creating cleanup job");
+    launch_cleanup_job(app_instance, ctx).await?;
+
+    let cond = await_condition(jobs, job_name, is_job_completed());
+    info!("Awaiting completion of {job_name}");
+    if tokio::time::timeout(Duration::from_secs(120), cond)
+        .await
+        .is_err()
+    {
+        Err(Error::ResourceDeletionTimeout)
+    } else {
+        info!("{job_name} deleted");
+        Ok(Action::await_change())
+    }
+}
+
+async fn launch_cleanup_job(app_instance: &AppInstance, ctx: &Context) -> Result<()> {
+    let ns = &app_instance.namespace().ok_or(Error::NamespaceRequired)?;
+    let cleanup_job_name = format!("kubit-cleanup-{}", &app_instance.name_any());
+
+    let mut volumes = vec![Volume {
+        name: "manifests".to_string(),
+        empty_dir: Some(Default::default()),
+        ..Default::default()
+    }];
+
+    if let Some(ref refs) = app_instance.spec.image_pull_secrets {
+        let secret_ref = refs
+            .iter()
+            .exactly_one()
+            .map_err(|_| Error::UnsupportedMultipleImagePullSecrets)?;
+
+        let docker_creds = Volume {
+            name: "docker".to_string(),
+            secret: Some(SecretVolumeSource {
+                secret_name: secret_ref.name.clone(),
+                items: Some(vec![KeyToPath {
+                    key: ".dockerconfigjson".to_string(),
+                    path: "config.json".to_string(),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        volumes.push(docker_creds);
+    }
+
+    let mk_mount = |name: &str| VolumeMount {
+        name: name.to_string(),
+        mount_path: format!("/{name}"),
+        ..Default::default()
+    };
+
+    let volume_mounts = Some(volumes.iter().map(|v| mk_mount(&v.name)).collect());
+    let container_defaults = Container {
+        volume_mounts: volume_mounts.clone(),
+        env: Some(vec![
+            EnvVar {
+                name: "DOCKER_CONFIG".to_string(),
+                value: Some("/docker".to_string()),
+                ..Default::default()
+            },
+            EnvVar {
+                name: "KUBECTL_APPLYSET".to_string(),
+                value: Some("true".to_string()),
+                ..Default::default()
+            },
+        ]),
+        ..Default::default()
+    };
+
+    let jobs: Api<Job> = Api::namespaced(ctx.client.clone(), ns);
+    let job = Job {
+        metadata: ObjectMeta {
+            name: Some(cleanup_job_name),
+            namespace: app_instance.namespace().clone(),
+            owner_references: owned_by(app_instance),
+            ..Default::default()
+        },
+        spec: Some(JobSpec {
+            backoff_limit: Some(0),
+            template: PodTemplateSpec {
+                spec: Some(PodSpec {
+                    service_account: Some(APPLIER_SERVICE_ACCOUNT.to_string()),
+                    restart_policy: Some("Never".to_string()),
+                    active_deadline_seconds: Some(180),
+                    volumes: Some(volumes),
+                    init_containers: Some(vec![Container {
+                        name: "setup-delete".to_string(),
+                        // We need to use the bitnami image to make use of the in built
+                        // shell to use the stdout redirection into a file.
+                        image: Some(apply::KUBECTL_IMAGE.to_string()),
+                        command: Some(vec!["/bin/sh".to_string()]),
+                        args: Some(vec![
+                            "-c".to_string(),
+                            delete::emit_deletion_setup(
+                                app_instance,
+                                &format!(
+                                    "/manifests/cm-{}",
+                                    delete::cleanup_hack_resource_name(app_instance)
+                                ),
+                                false,
+                            )
+                            .join(" "),
+                        ]),
+                        ..container_defaults.clone()
+                    }]),
+                    containers: vec![Container {
+                        name: "cleanup-manifests".to_string(),
+                        image: Some(KUBECTL_IMAGE.to_string()),
+                        command: Some(delete::emit_commandline(
+                            app_instance,
+                            &format!(
+                                "/manifests/cm-{}",
+                                delete::cleanup_hack_resource_name(app_instance)
+                            ),
+                            false,
+                        )),
+                        ..container_defaults.clone()
+                    }],
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let pp = PostParams::default();
+
+    handle_resource_exists(jobs.create(&pp, &job).await)?;
+
+    Ok(())
 }
 
 async fn reconciliation_state(
@@ -231,7 +468,7 @@ async fn reconciliation_state(
 ) -> Result<ReconciliationState> {
     let ns = app_instance.namespace_any();
     let api: Api<Job> = Api::namespaced(ctx.client.clone(), &ns);
-    let job_name = job_name_for(app_instance);
+    let job_name = job_name_for(app_instance, "apply");
     let job = api.get_opt(&job_name).await?;
 
     Ok(match job {
@@ -399,14 +636,14 @@ async fn launch_job(app_instance: &AppInstance, ctx: &Context) -> Result<()> {
     create_job(app_instance, kubecfg_image, ctx).await
 }
 
-fn job_name_for(app_instance: &AppInstance) -> String {
-    format!("kubit-apply-{}", app_instance.name_any())
+fn job_name_for(app_instance: &AppInstance, job_type: &str) -> String {
+    format!("kubit-{job_type}-{}", app_instance.name_any())
 }
 
 async fn delete_job(app_instance: &AppInstance, ctx: &Context) -> Result<()> {
     let ns = &app_instance.namespace().ok_or(Error::NamespaceRequired)?;
     let jobs: Api<Job> = Api::namespaced(ctx.client.clone(), ns);
-    let name = job_name_for(app_instance);
+    let name = job_name_for(app_instance, "apply");
     jobs.delete(
         &name,
         &DeleteParams {
@@ -425,7 +662,7 @@ async fn create_job(
     ctx: &Context,
 ) -> Result<()> {
     let ns = &app_instance.namespace().ok_or(Error::NamespaceRequired)?;
-    let job_name = job_name_for(app_instance);
+    let job_name = job_name_for(app_instance, "apply");
 
     let mut volumes = vec![
         Volume {
@@ -580,7 +817,7 @@ async fn capture_logs(
     info!(?ns, "reporting errors");
 
     let pods_api: Api<Pod> = Api::namespaced(ctx.client.clone(), ns);
-    let job_name = job_name_for(app_instance);
+    let job_name = job_name_for(app_instance, "apply");
 
     let pods = pods_api
         .list(&ListParams {

@@ -1,5 +1,7 @@
 #![deny(rustdoc::broken_intra_doc_links, rustdoc::bare_urls, rust_2018_idioms)]
 
+use local::DryRun;
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Kube Error: {0}")]
@@ -13,6 +15,9 @@ pub enum Error {
 
     #[error("Unsupported manifest type: Index")]
     UnsupportedManifestIndex,
+
+    #[error("Unsupported dry run option: {0}")]
+    UnsupportedDryRunOption(DryRun),
 
     #[error("Error decoding package config JSON: {0}")]
     DecodePackageConfig(serde_json::Error),
@@ -43,6 +48,14 @@ pub enum Error {
 
     #[error("Unsupported image pull secret type: {0:?}, should be kubernetes.io/dockerconfigjson")]
     BadImagePullSecretType(Option<String>),
+
+    #[error("Finalizer Error: {0}")]
+    // NB: awkward type because finalizer::Error embeds the reconciler error (which is this)
+    // so boxing this error to break cycles
+    FinalizerError(#[source] Box<kube::runtime::finalizer::Error<Error>>),
+
+    #[error("Timeout elapsed before object could be deleted, retrying")]
+    ResourceDeletionTimeout,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -54,6 +67,7 @@ pub mod controller;
 pub mod resources;
 
 pub mod apply;
+pub mod delete;
 pub mod helpers;
 pub mod local;
 pub mod metadata;
