@@ -20,7 +20,7 @@ This means that the installation experience is decoupled from the language of ch
 ### Kubernetes controller
 
 ```bash
-kubectl apply -k 'https://github.com/kubecfg/kubit//kustomize/global?ref=v0.0.12'
+kubectl apply -k 'https://github.com/kubecfg/kubit//kustomize/global?ref=v0.0.13'
 ```
 
 The Kubernetes controller is the main way to use kubit.
@@ -40,7 +40,7 @@ brew install kubecfg/kubit/kubit
 Direct install from sources:
 
 ```bash
-cargo install --git https://github.com/kubecfg/kubit/ --tag v0.0.12
+cargo install --git https://github.com/kubecfg/kubit/ --tag v0.0.13
 ```
 
 The CLI is an optional tool that provides helpers and alternative ways to install and inspect packages.
@@ -103,18 +103,18 @@ kubecfg pack ghcr.io/kubecfg/demo:v0.1.0 demo.jsonnet
 
 ### Installing packages manually
 
-You can run the same logic that the kubit controller does when rendering and applying a template by running
+You can run the same logic that the `kubit` controller does when rendering and applying a template by running
 the `kubit` CLI tool from your laptop:
 
 ```bash
 kubit local apply foo.yaml
 ```
 
-Kubit is just a relatively thin wrapper on top of `kubecfg`.
-For increased compatibility, it uses standard `kubectl apply` to apply the manifests using more standard
-tooling rather than kubecfg's integrated k8s API.
+`kubit` is just a relatively thin wrapper on top of `kubecfg`.
+For increased compatibility, it uses the `kubectl apply` operation to apply the manifests using more standard
+tooling, rather than the `kubecfg` integrated Kubernetes API.
 
-You can preview the actuall commands that `kubit` will run with:
+You can preview the actual commands that `kubit` will run with:
 
 ```bash
 kubit local apply foo.yaml --dry-run=script
@@ -122,7 +122,10 @@ kubit local apply foo.yaml --dry-run=script
 
 Other interesting options are `--dry-run=render` and `--dry-run=diff` which will respectively just render the YAML without applying it
 and rendering + diffing the manifests against a running application. This can be useful to preview effects of changes in the spec or
-between versions of a package
+between versions of a package.
+
+If you do not wish to install later versions of `kubectl` and `kubecfg` onto your system, you can specify the `--docker` flag to have the
+dependencies run as Docker containers instead.
 
 ### Trying local package changes
 
