@@ -1,6 +1,9 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
-use k8s_openapi::{api::core::v1::LocalObjectReference, apimachinery::pkg::apis::meta::v1::Time};
+use k8s_openapi::{
+    api::core::v1::{ConfigMap, LocalObjectReference},
+    apimachinery::pkg::apis::meta::v1::Time,
+};
 use kube::{CustomResource, ResourceExt};
 use schemars::{
     schema::{Schema, SchemaObject},
@@ -32,6 +35,12 @@ impl AppInstance {
     pub fn namespace_any(&self) -> String {
         self.namespace().unwrap_or_default()
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum AppInstanceLikeResources {
+    AppInstance(Arc<AppInstance>),
+    ConfigMap(Arc<ConfigMap>),
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]

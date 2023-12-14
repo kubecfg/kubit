@@ -314,7 +314,7 @@ async fn write_delete_script(
     let output_path = &format!(
         "{}/{}",
         tmp_dir.path().display(),
-        cleanup_hack_resource_name(&app_instance)
+        cleanup_hack_resource_name(&app_instance.name_any())
     );
 
     if !docker {
@@ -322,9 +322,9 @@ async fn write_delete_script(
     }
 
     steps.extend([
-        delete::setup_script(&app_instance, output_path, docker)?,
+        delete::setup_script(&app_instance, &app_instance.name_any(), output_path, docker)?,
         delete::script(&app_instance, output_path, docker)?,
-        delete::post_pruning_script(&app_instance, docker)?,
+        delete::post_pruning_script(&app_instance, &app_instance.name_any(), docker)?,
     ]);
 
     let script: Script = steps.into_iter().sum();

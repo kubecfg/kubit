@@ -1,0 +1,11 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kubit
+rules:
+  # The kubit operator will create a specific namespace-scoped role used by the applier to apply arbitrary
+  # package into the namespace. In order to create that role in any namespace we need admin
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["create", "update", "get", "list", "patch", "watch", "delete"]

@@ -135,6 +135,29 @@ Sometimes you'd like to try out some jsonnet code before you package it up and p
 kubit local apply foo.yaml --dry-run=diff --package-image file://$HOME/my-project/my-main.jsonnet
 ```
 
+### Single Namespace Support
+
+By default `kubit` runs in its own `kubit` namespace. This is not always desired, so `kubit` also supports running in a specified namespace.
+This has a few advantages:
+
+- `kubit` only requires a `Role` and `RoleBinding` when running in a single namespace and does not require the `CRD`
+- In companies/environments where namespaces are limited, `kubit` can run alongside the app without needing a second namespace
+
+To use `kubit` in single namespace mode, install the `single-namespace` flavor of the `kustomize` package into a specific namespace:
+
+```
+kubectl apply -k 'https://github.com/kubecfg/kubit//kustomize/single-namespace?ref=v0.0.13' -n <my-application-namespace>
+```
+
+This instance of `kubit` is then configured by creating a `ConfigMap` named `app-instance` with the `data` field containing a key `app-instance` with the yaml
+version of the `AppInstance`.
+
+Example for how to create this `ConfigMap`:
+
+```
+kubectl create configmap -n mycoolapp app-instance --from-file=app-instance=example-kubit-testing.yaml
+```
+
 ## Development
 
 ### Without in-cluster controller
