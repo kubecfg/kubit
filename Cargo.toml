@@ -33,7 +33,7 @@ itertools = "0.12.0"
 base64 = "0.21.5"
 assert_matches = "1.5.0"
 docker_credential = "1.2.1"
-home = { version = "0.5.5", features = [] }
+home = { version = "0.5.9", features = [] }
 
 [dev-dependencies]
 assert_cmd = "2.0.12"
