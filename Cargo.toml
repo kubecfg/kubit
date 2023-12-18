@@ -25,7 +25,7 @@ serde_json = "1"
 serde_yaml = "0.9.27"
 jsonpath_lib = "0.3.0"
 thiserror = "1"
-oci-distribution = { version = "0.9.4", features = ["rustls-tls"], default-features = false }
+oci-distribution = { version = "0.10.0", features = ["rustls-tls"], default-features = false }
 tempfile = "3"
 yash-quote = "1"
 tynm = "0.1.9"
