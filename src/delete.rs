@@ -76,7 +76,11 @@ pub fn emit_commandline(
     cli
 }
 
-pub fn emit_post_deletion_commandline(app_instance: &AppInstance, docker: bool) -> Vec<String> {
+pub fn emit_post_deletion_commandline(
+    app_instance: &AppInstance,
+    name: &str,
+    docker: bool,
+) -> Vec<String> {
     let mut cli: Vec<String> = vec![];
 
     if docker {
@@ -114,7 +118,7 @@ pub fn emit_post_deletion_commandline(app_instance: &AppInstance, docker: bool) 
         [
             "delete",
             "configmap",
-            &cleanup_hack_resource_name(app_instance),
+            &cleanup_hack_resource_name(name),
             "--namespace",
             &app_instance.namespace_any(),
         ]
@@ -133,6 +137,7 @@ pub fn emit_post_deletion_commandline(app_instance: &AppInstance, docker: bool) 
 /// requires that _some_ objects are passed to it.
 pub fn emit_deletion_setup(
     app_instance: &AppInstance,
+    name: &str,
     output_path: &str,
     docker: bool,
 ) -> Vec<String> {
@@ -173,7 +178,7 @@ pub fn emit_deletion_setup(
         [
             "create",
             "configmap",
-            &cleanup_hack_resource_name(app_instance),
+            &cleanup_hack_resource_name(name),
             "--namespace",
             &app_instance.namespace_any(),
             "--dry-run=client",
@@ -190,8 +195,8 @@ pub fn emit_deletion_setup(
 }
 
 /// Utility to generate the cleanup configmap name based on a given name.
-pub fn cleanup_hack_resource_name(app_instance: &AppInstance) -> String {
-    format!("{}-cleanup", app_instance.name_any())
+pub fn cleanup_hack_resource_name(name: &str) -> String {
+    format!("{}-cleanup", name)
 }
 
 /// Generates a shell script that will cleanup the created AppInstance resources.
@@ -203,14 +208,19 @@ pub fn script(app_instance: &AppInstance, deletion_dir: &str, docker: bool) -> R
 /// Generates a shell script that is used post prune operation of the AppInstance
 /// resources. In other words, it is used to delete the blank ConfigMap that was
 /// used as the blank applyset.
-pub fn post_pruning_script(app_instance: &AppInstance, docker: bool) -> Result<Script> {
-    let configmap_deletion = emit_post_deletion_commandline(app_instance, docker);
+pub fn post_pruning_script(app_instance: &AppInstance, name: &str, docker: bool) -> Result<Script> {
+    let configmap_deletion = emit_post_deletion_commandline(app_instance, name, docker);
     Ok(Script::from_vec(configmap_deletion))
 }
 
 /// Generates a shell script that is used as a helper during the cleanup process
 /// of the associated AppInstance.
-pub fn setup_script(app_instance: &AppInstance, output_path: &str, docker: bool) -> Result<Script> {
-    let cleanup_helper = emit_deletion_setup(app_instance, output_path, docker);
+pub fn setup_script(
+    app_instance: &AppInstance,
+    name: &str,
+    output_path: &str,
+    docker: bool,
+) -> Result<Script> {
+    let cleanup_helper = emit_deletion_setup(app_instance, name, output_path, docker);
     Ok(Script::from_vec(cleanup_helper))
 }

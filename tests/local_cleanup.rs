@@ -1,6 +1,7 @@
 use assert_cmd::prelude::*;
 use k8s_openapi::api::core::v1::ConfigMap;
 use k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service};
+use kube::ResourceExt;
 use kube::{api::ListParams, client, Api};
 use kubit::delete::cleanup_hack_resource_name;
 use kubit::resources::AppInstance;
@@ -30,7 +31,7 @@ async fn local_cleanup() {
     let sts_api: Api<StatefulSet> = Api::namespaced(client.clone(), namespace);
     let svc_api: Api<Service> = Api::namespaced(client.clone(), namespace);
     let cm_api: Api<ConfigMap> = Api::namespaced(client.clone(), namespace);
-    let cleanup_cm_name = cleanup_hack_resource_name(&app_instance);
+    let cleanup_cm_name = cleanup_hack_resource_name(&app_instance.name_any());
     let list_params = ListParams::default();
 
     let sts = sts_api
@@ -87,7 +88,7 @@ async fn local_cleanup_with_docker() {
     let sts_api: Api<StatefulSet> = Api::namespaced(client.clone(), namespace);
     let svc_api: Api<Service> = Api::namespaced(client.clone(), namespace);
     let cm_api: Api<ConfigMap> = Api::namespaced(client.clone(), namespace);
-    let cleanup_cm_name = cleanup_hack_resource_name(&app_instance);
+    let cleanup_cm_name = cleanup_hack_resource_name(&app_instance.name_any());
     let list_params = ListParams::default();
 
     let sts = sts_api

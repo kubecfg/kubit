@@ -50,6 +50,12 @@ async fn main() -> anyhow::Result<()> {
 
         #[command(subcommand)]
         command: Option<Commands>,
+
+        #[clap(long, env = "KUBIT_WATCHED_NAMESPACE", default_value = None)]
+        watched_namespace: Option<String>,
+
+        #[clap(long, default_value = "app-instance")]
+        config_map_name: Option<String>,
     }
 
     #[derive(Clone, Subcommand)]
@@ -112,6 +118,8 @@ async fn main() -> anyhow::Result<()> {
         kubit_image,
         command,
         only_paused,
+        watched_namespace,
+        config_map_name,
     } = Args::parse();
 
     // Expand vector as more CRDs are created.
@@ -164,7 +172,14 @@ async fn main() -> anyhow::Result<()> {
                 .build()
                 .await?;
 
-            let controller = controller::run(rt.client(), kubecfg_image, kubit_image, only_paused);
+            let controller = controller::run(
+                rt.client(),
+                kubecfg_image,
+                kubit_image,
+                only_paused,
+                config_map_name,
+                watched_namespace,
+            );
 
             // Both runtimes implements graceful shutdown, so poll until both are done
             tokio::join!(controller, rt.run()).1?;

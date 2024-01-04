@@ -37,6 +37,9 @@ pub enum Error {
     #[error("Namespace is required")]
     NamespaceRequired,
 
+    #[error("ConfigMap is required")]
+    ConfigMapRequired,
+
     #[error(".spec.imagePullSecret currently requires to have exactly one pull secret")]
     UnsupportedMultipleImagePullSecrets,
 
@@ -56,6 +59,12 @@ pub enum Error {
 
     #[error("Timeout elapsed before object could be deleted, retrying")]
     ResourceDeletionTimeout,
+
+    #[error("The ConfigMap had an invalid status: {0}")]
+    InvalidConfigMapStatus(#[from] serde_json::Error),
+
+    #[error("The ConfigMap could not be converted to an AppInstance: {0}")]
+    InvalidConfigMap(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
