@@ -12,7 +12,7 @@ pub enum Error {
     Base64Decode(#[from] base64::DecodeError),
 
     #[error("Error decoding content of base64 field inside docker config auth section: {0}")]
-    FromUtf8Error(#[from] std::string::FromUtf8Error),
+    FromUtf8(#[from] std::string::FromUtf8Error),
 
     #[error("Missing colon in auth field")]
     MissingColon,
