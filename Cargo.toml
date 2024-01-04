@@ -13,9 +13,20 @@ description = "Install kubecfg packages"
 [dependencies]
 clap = { version = "4.4", features = ["derive", "help", "env", "std"] }
 futures = "0.3"
-kube = { version = "0.85.0", features = ["runtime", "client", "derive", "rustls-tls"], default-features = false }
-k8s-openapi = { version = "0.19.0", features = ["v1_26", "schemars"] }
-kubert = { version = "0.19.0", features = ["clap", "runtime", "server", "metrics", "rustls-tls"], default-features = false}
+kube = { version = "0.87.2", features = [
+    "runtime",
+    "client",
+    "derive",
+    "rustls-tls",
+], default-features = false }
+k8s-openapi = { version = "0.20.0", features = ["v1_26", "schemars"] }
+kubert = { version = "0.21.1", features = [
+    "clap",
+    "runtime",
+    "server",
+    "prometheus-client",
+    "rustls-tls",
+], default-features = false }
 tokio = { version = "1.35", features = ["full"] }
 anyhow = { version = "1", features = ["backtrace"] }
 tracing = "0.1"
@@ -25,7 +36,9 @@ serde_json = "1"
 serde_yaml = "0.9.30"
 jsonpath_lib = "0.3.0"
 thiserror = "1"
-oci-distribution = { version = "0.10.0", features = ["rustls-tls"], default-features = false }
+oci-distribution = { version = "0.10.0", features = [
+    "rustls-tls",
+], default-features = false }
 tempfile = "3"
 yash-quote = "1"
 tynm = "0.1.9"
@@ -34,6 +47,7 @@ base64 = "0.21.5"
 assert_matches = "1.5.0"
 docker_credential = "1.2.1"
 home = { version = "0.5.9", features = [] }
+prometheus-client = "0.22"
 
 [dev-dependencies]
 assert_cmd = "2.0.12"
