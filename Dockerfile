@@ -1,6 +1,6 @@
 # Leveraging the pre-built Docker images with
 # cargo-chef and the Rust toolchain
-FROM lukemathwalker/cargo-chef:latest-rust-1.75.0@sha256:4f0dda37ef33af7859ee7526b901f55c145f5426673d5d0943ed953c6719b798 AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-1.75.0@sha256:f4834d624fa88ecfb9e3c6feb503b72cc6cff3fb0cb0c8ee39d4eeb1f525b1c4 AS chef
 WORKDIR app
 
 FROM chef AS planner
