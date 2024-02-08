@@ -16,7 +16,12 @@ use serde::{Deserialize, Serialize};
     group = "kubecfg.dev",
     version = "v1alpha1",
     kind = "AppInstance",
-    namespaced
+    namespaced,
+    printcolumn = r#"{"name":"image", "type":"string", "description":"Image in use for the installed package", "jsonPath":".spec.package.image"}"#,
+    printcolumn = r#"{"name":"apiversion", "type":"string", "description":"apiVersion for the installed package", "jsonPath":".spec.package.apiVersion"}"#,
+    printcolumn = r#"{"name":"paused", "type":"boolean", "description":"Is the AppInstance reconcillation paused?", "jsonPath":".spec.pause"}"#,
+    printcolumn = r#"{"name":"reason", "type":"string", "description":"Latest reason emitted from the deployed package", "jsonPath":".status.conditions[-1].reason"}"#,
+    printcolumn = r#"{"name":"status", "type":"string", "description":"Latest status of the deployed package", "jsonPath":".status.conditions[-1].status"}"#
 )]
 #[kube(status = "AppInstanceStatus")]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +32,6 @@ pub struct AppInstanceSpec {
     /// If true, the controller will not reconcile this application.
     /// You can use this if you need to do some manual changes (either with kubectl directly or with kubit CLI)
     #[serde(default)]
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub pause: bool,
 }
 
