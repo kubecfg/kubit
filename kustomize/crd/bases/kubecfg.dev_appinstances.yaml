@@ -26,6 +26,14 @@ spec:
       jsonPath: .spec.pause
       name: paused
       type: boolean
+    - description: Latest reason emitted from the deployed package
+      jsonPath: .status.conditions[-1].reason
+      name: reason
+      type: string
+    - description: Latest status of the deployed package
+      jsonPath: .status.conditions[-1].status
+      name: status
+      type: string
     name: v1alpha1
     schema:
       openAPIV3Schema:
