@@ -16,7 +16,10 @@ use serde::{Deserialize, Serialize};
     group = "kubecfg.dev",
     version = "v1alpha1",
     kind = "AppInstance",
-    namespaced
+    namespaced,
+    printcolumn = r#"{"name":"image", "type":"string", "description":"Image in use for the installed package", "jsonPath":".spec.package.image"}"#,
+    printcolumn = r#"{"name":"apiversion", "type":"string", "description":"apiVersion for the installed package", "jsonPath":".spec.package.apiVersion"}"#,
+    printcolumn = r#"{"name":"paused", "type":"boolean", "description":"Is the AppInstance reconcillation paused?", "jsonPath":".spec.pause"}"#
 )]
 #[kube(status = "AppInstanceStatus")]
 #[serde(rename_all = "camelCase")]
