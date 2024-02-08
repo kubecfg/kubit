@@ -30,7 +30,6 @@ pub struct AppInstanceSpec {
     /// If true, the controller will not reconcile this application.
     /// You can use this if you need to do some manual changes (either with kubectl directly or with kubit CLI)
     #[serde(default)]
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub pause: bool,
 }
 
