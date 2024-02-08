@@ -13,7 +13,19 @@ spec:
     singular: appinstance
   scope: Namespaced
   versions:
-  - additionalPrinterColumns: []
+  - additionalPrinterColumns:
+    - description: Image in use for the installed package
+      jsonPath: .spec.package.image
+      name: image
+      type: string
+    - description: apiVersion for the installed package
+      jsonPath: .spec.package.apiVersion
+      name: apiversion
+      type: string
+    - description: Is the AppInstance reconcillation paused?
+      jsonPath: .spec.pause
+      name: paused
+      type: boolean
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -46,6 +58,7 @@ spec:
                 - spec
                 type: object
               pause:
+                default: false
                 description: If true, the controller will not reconcile this application. You can use this if you need to do some manual changes (either with kubectl directly or with kubit CLI)
                 type: boolean
             required:
