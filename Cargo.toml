@@ -50,5 +50,5 @@ home = { version = "0.5.9", features = [] }
 prometheus-client = "0.22"
 
 [dev-dependencies]
-assert_cmd = "2.0.13"
+assert_cmd = "2.0.14"
 predicates = "3.0.4"
