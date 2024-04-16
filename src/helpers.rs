@@ -46,6 +46,7 @@ pub async fn run(helper: &Helper) -> Result<()> {
             let api: Api<AppInstance> = Api::namespaced(client, namespace);
             let mut app_instance = api.get(app_instance).await?;
             app_instance.status = None;
+            app_instance.metadata.managed_fields = None;
 
             let file = File::create(output)?;
             serde_json::to_writer_pretty(file, &app_instance)?;
