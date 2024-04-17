@@ -66,6 +66,7 @@ jobs:
         if: github.event_name != 'pull_request'
 
       - name: Build
+        if: "!github.event.pull_request.head.repo.fork"
         uses: depot/build-push-action@e7743ee6585d261968c7ae0ef64977ee98c09d74 # v1
         with:
           project: v8n5whjnsb
@@ -75,6 +76,7 @@ jobs:
           tags: ghcr.io/kubecfg/kubit:latest
           load: true
       - name: Test
+        if: "!github.event.pull_request.head.repo.fork"
         run: |
           docker run --rm ghcr.io/kubecfg/kubit:latest --version
       - name: Push
