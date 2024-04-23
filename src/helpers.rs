@@ -47,6 +47,11 @@ pub async fn run(helper: &Helper) -> Result<()> {
             let mut app_instance = api.get(app_instance).await?;
             app_instance.status = None;
             app_instance.metadata.managed_fields = None;
+            app_instance
+                .metadata
+                .labels
+                .as_mut()
+                .and_then(|labels| labels.remove("applyset.kubernetes.io/part-of"));
 
             let file = File::create(output)?;
             serde_json::to_writer_pretty(file, &app_instance)?;
