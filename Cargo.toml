@@ -28,7 +28,7 @@ kubert = { version = "0.21.2", features = [
     "rustls-tls",
 ], default-features = false }
 tokio = { version = "1.36", features = ["full"] }
-anyhow = { version = "1", features = ["backtrace"] }
+anyhow = { version = "1.0.82", features = ["backtrace"] }
 tracing = "0.1"
 schemars = "0.8.17"
 serde = { version = "1", features = ["derive"] }
