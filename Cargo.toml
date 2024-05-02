@@ -39,7 +39,7 @@ thiserror = "1"
 oci-distribution = { version = "0.10.0", features = [
     "rustls-tls",
 ], default-features = false }
-tempfile = "3"
+tempfile = "3.10.1"
 yash-quote = "1"
 tynm = "0.1.10"
 itertools = "0.12.1"
