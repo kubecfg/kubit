@@ -1,6 +1,6 @@
 [package]
 name = "kubit"
-version = "0.0.16"
+version = "0.0.17"
 license = "MIT"
 edition = "2021"
 keywords = ["kubernetes"]
