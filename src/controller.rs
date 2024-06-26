@@ -7,7 +7,9 @@ use k8s_openapi::{
             ConfigMap, Container, EnvVar, KeyToPath, Pod, PodSpec, PodTemplateSpec, Secret,
             SecretVolumeSource, ServiceAccount, Volume, VolumeMount,
         },
-        rbac::v1::{PolicyRule, Role, RoleBinding, RoleRef, Subject},
+        rbac::v1::{
+            ClusterRole, ClusterRoleBinding, PolicyRule, Role, RoleBinding, RoleRef, Subject,
+        },
     },
     apimachinery::pkg::apis::meta::v1::{OwnerReference, Time},
     chrono::Utc,
@@ -709,6 +711,66 @@ impl AppInstanceLike {
         }
     }
 
+    async fn setup_crd_create_permission(&self, ctx: &Context) -> Result<()> {
+        let ns = self.instance.namespace_any();
+        let pp = patch_params();
+        let crd_name = format!("{APPLIER_SERVICE_ACCOUNT}-crd");
+
+        let metadata = ObjectMeta {
+            name: Some(crd_name.clone()),
+            namespace: None,
+            owner_references: self.owned_by(),
+            ..Default::default()
+        };
+
+        let role: Api<ClusterRole> = Api::all(ctx.client.clone());
+        let res = ClusterRole {
+            metadata: metadata.clone(),
+            rules: Some(vec![PolicyRule {
+                api_groups: Some(
+                    ["apiextensions.k8s.io"]
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
+                ),
+                resources: Some(
+                    ["customresourcedefinitions"]
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
+                ),
+                verbs: ["create", "patch", "list", "get"]
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect(),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+        role.patch(&res.name_any(), &pp, &Patch::Apply(&res))
+            .await?;
+
+        let api: Api<ClusterRoleBinding> = Api::all(ctx.client.clone());
+        let role_binding = ClusterRoleBinding {
+            metadata: metadata.clone(),
+            role_ref: RoleRef {
+                api_group: "rbac.authorization.k8s.io".to_string(),
+                kind: "ClusterRole".to_string(),
+                name: crd_name.clone(),
+            },
+            subjects: Some(vec![Subject {
+                kind: "ServiceAccount".to_string(),
+                name: APPLIER_SERVICE_ACCOUNT.to_string(),
+                namespace: Some(ns),
+                ..Default::default()
+            }]),
+        };
+        api.patch(&role_binding.name_any(), &pp, &Patch::Apply(&role_binding))
+            .await?;
+
+        Ok(())
+    }
+
     async fn setup_job_rbac(&self, ctx: &Context) -> Result<()> {
         let ns = self.instance.namespace_any();
         let pp = patch_params();
@@ -763,6 +825,8 @@ impl AppInstanceLike {
         };
         api.patch(&role_binding.name_any(), &pp, &Patch::Apply(&role_binding))
             .await?;
+
+        self.setup_crd_create_permission(ctx).await?;
 
         Ok(())
     }
