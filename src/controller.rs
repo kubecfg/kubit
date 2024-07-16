@@ -488,7 +488,7 @@ impl AppInstanceLike {
         ctx: &Context,
     ) -> Result<Action> {
         info!("Setting up RBAC");
-        self.setup_job_rbac(ctx).await?;
+        self.setup_namespaced_roles(ctx).await?;
         info!("Creating cleanup job");
         self.launch_cleanup_job(ctx).await?;
 
@@ -711,7 +711,7 @@ impl AppInstanceLike {
         }
     }
 
-    async fn setup_crd_create_permission(&self, ctx: &Context) -> Result<()> {
+    async fn setup_cluster_roles(&self, ctx: &Context) -> Result<()> {
         let ns = self.instance.namespace_any();
         let pp = patch_params();
         let crd_name = format!("{APPLIER_SERVICE_ACCOUNT}-crd");
@@ -726,25 +726,65 @@ impl AppInstanceLike {
         let role: Api<ClusterRole> = Api::all(ctx.client.clone());
         let res = ClusterRole {
             metadata: metadata.clone(),
-            rules: Some(vec![PolicyRule {
-                api_groups: Some(
-                    ["apiextensions.k8s.io"]
+            rules: Some(vec![
+                PolicyRule {
+                    api_groups: Some(
+                        ["rbac.authorization.k8s.io"]
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect(),
+                    ),
+                    resources: Some(
+                        ["clusterroles", "clusterrolebindings"]
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect(),
+                    ),
+                    verbs: ["delete", "create", "patch", "list", "get"]
                         .iter()
                         .map(|s| s.to_string())
                         .collect(),
-                ),
-                resources: Some(
-                    ["customresourcedefinitions"]
+                    ..Default::default()
+                },
+                PolicyRule {
+                    api_groups: Some(
+                        ["apiextensions.k8s.io"]
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect(),
+                    ),
+                    resources: Some(
+                        ["customresourcedefinitions"]
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect(),
+                    ),
+                    verbs: ["delete", "create", "patch", "list", "get"]
                         .iter()
                         .map(|s| s.to_string())
                         .collect(),
-                ),
-                verbs: ["create", "patch", "list", "get"]
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect(),
-                ..Default::default()
-            }]),
+                    ..Default::default()
+                },
+                PolicyRule {
+                    api_groups: Some(
+                        ["influxdata.io"]
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect(),
+                    ),
+                    resources: Some(
+                        ["*"]
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect(),
+                    ),
+                    verbs: ["watch", "update", "delete", "create", "patch", "list", "get"]
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
+                    ..Default::default()
+                },
+            ]),
             ..Default::default()
         };
         role.patch(&res.name_any(), &pp, &Patch::Apply(&res))
@@ -771,7 +811,7 @@ impl AppInstanceLike {
         Ok(())
     }
 
-    async fn setup_job_rbac(&self, ctx: &Context) -> Result<()> {
+    async fn setup_namespaced_roles(&self, ctx: &Context) -> Result<()> {
         let ns = self.instance.namespace_any();
         let pp = patch_params();
 
@@ -826,13 +866,12 @@ impl AppInstanceLike {
         api.patch(&role_binding.name_any(), &pp, &Patch::Apply(&role_binding))
             .await?;
 
-        self.setup_crd_create_permission(ctx).await?;
-
         Ok(())
     }
 
     async fn launch_job(&self, ctx: &Context) -> Result<()> {
-        self.setup_job_rbac(ctx).await?;
+        self.setup_namespaced_roles(ctx).await?;
+        self.setup_cluster_roles(ctx).await?;
 
         let package_config: PackageConfig = self.fetch_package_config(ctx).await?;
         info!("got package config");
