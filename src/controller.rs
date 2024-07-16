@@ -488,7 +488,7 @@ impl AppInstanceLike {
         ctx: &Context,
     ) -> Result<Action> {
         info!("Setting up RBAC");
-        self.setup_job_rbac(ctx).await?;
+        self.setup_namespaced_roles(ctx).await?;
         info!("Creating cleanup job");
         self.launch_cleanup_job(ctx).await?;
 
@@ -711,7 +711,7 @@ impl AppInstanceLike {
         }
     }
 
-    async fn setup_crd_create_permission(&self, ctx: &Context) -> Result<()> {
+    async fn setup_cluster_roles(&self, ctx: &Context) -> Result<()> {
         let ns = self.instance.namespace_any();
         let pp = patch_params();
         let crd_name = format!("{APPLIER_SERVICE_ACCOUNT}-crd");
@@ -739,7 +739,7 @@ impl AppInstanceLike {
                         .map(|s| s.to_string())
                         .collect(),
                 ),
-                verbs: ["create", "patch", "list", "get"]
+                verbs: ["delete", "create", "patch", "list", "get"]
                     .iter()
                     .map(|s| s.to_string())
                     .collect(),
@@ -771,7 +771,7 @@ impl AppInstanceLike {
         Ok(())
     }
 
-    async fn setup_job_rbac(&self, ctx: &Context) -> Result<()> {
+    async fn setup_namespaced_roles(&self, ctx: &Context) -> Result<()> {
         let ns = self.instance.namespace_any();
         let pp = patch_params();
 
@@ -826,13 +826,12 @@ impl AppInstanceLike {
         api.patch(&role_binding.name_any(), &pp, &Patch::Apply(&role_binding))
             .await?;
 
-        self.setup_crd_create_permission(ctx).await?;
-
         Ok(())
     }
 
     async fn launch_job(&self, ctx: &Context) -> Result<()> {
-        self.setup_job_rbac(ctx).await?;
+        self.setup_namespaced_roles(ctx).await?;
+        self.setup_cluster_roles(ctx).await?;
 
         let package_config: PackageConfig = self.fetch_package_config(ctx).await?;
         info!("got package config");
