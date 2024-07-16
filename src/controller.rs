@@ -726,65 +726,25 @@ impl AppInstanceLike {
         let role: Api<ClusterRole> = Api::all(ctx.client.clone());
         let res = ClusterRole {
             metadata: metadata.clone(),
-            rules: Some(vec![
-                PolicyRule {
-                    api_groups: Some(
-                        ["rbac.authorization.k8s.io"]
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect(),
-                    ),
-                    resources: Some(
-                        ["clusterroles", "clusterrolebindings"]
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect(),
-                    ),
-                    verbs: ["delete", "create", "patch", "list", "get"]
+            rules: Some(vec![PolicyRule {
+                api_groups: Some(
+                    ["apiextensions.k8s.io"]
                         .iter()
                         .map(|s| s.to_string())
                         .collect(),
-                    ..Default::default()
-                },
-                PolicyRule {
-                    api_groups: Some(
-                        ["apiextensions.k8s.io"]
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect(),
-                    ),
-                    resources: Some(
-                        ["customresourcedefinitions"]
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect(),
-                    ),
-                    verbs: ["delete", "create", "patch", "list", "get"]
+                ),
+                resources: Some(
+                    ["customresourcedefinitions"]
                         .iter()
                         .map(|s| s.to_string())
                         .collect(),
-                    ..Default::default()
-                },
-                PolicyRule {
-                    api_groups: Some(
-                        ["influxdata.io"]
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect(),
-                    ),
-                    resources: Some(
-                        ["*"]
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect(),
-                    ),
-                    verbs: ["watch", "update", "delete", "create", "patch", "list", "get"]
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect(),
-                    ..Default::default()
-                },
-            ]),
+                ),
+                verbs: ["delete", "create", "patch", "list", "get"]
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect(),
+                ..Default::default()
+            }]),
             ..Default::default()
         };
         role.patch(&res.name_any(), &pp, &Patch::Apply(&res))
