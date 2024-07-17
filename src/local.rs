@@ -179,7 +179,7 @@ pub async fn apply(
     let mut app_instance: AppInstance = serde_yaml::from_reader(file)?;
 
     if let Some(package_image) = package_image {
-        app_instance.spec.package.image = package_image.clone();
+        app_instance.spec.package.image.clone_from(package_image);
     }
 
     if pre_diff {
@@ -355,7 +355,7 @@ async fn prediff(
     let mut app_instance: AppInstance = serde_yaml::from_reader(file)?;
 
     if let Some(package_image) = package_image {
-        app_instance.spec.package.image = package_image.clone();
+        app_instance.spec.package.image.clone_from(package_image);
     }
 
     write_apply_script(
