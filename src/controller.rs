@@ -305,7 +305,7 @@ impl AppInstanceLike {
             let config = &config[key];
             let mut ai: AppInstance =
                 serde_yaml::from_str(config).map_err(|e| Error::InvalidConfigMap(e.to_string()))?;
-            ai.metadata.uid = config_map.metadata.uid.clone();
+            ai.metadata.uid.clone_from(&config_map.metadata.uid);
             Ok(Self {
                 original: AppInstanceLikeResources::ConfigMap(config_map),
                 instance: Arc::new(ai),
