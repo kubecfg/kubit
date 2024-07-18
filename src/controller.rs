@@ -728,16 +728,20 @@ impl AppInstanceLike {
             metadata: metadata.clone(),
             rules: Some(vec![PolicyRule {
                 api_groups: Some(
-                    ["apiextensions.k8s.io"]
+                    ["apiextensions.k8s.io", "rbac.authorization.k8s.io"]
                         .iter()
                         .map(|s| s.to_string())
                         .collect(),
                 ),
                 resources: Some(
-                    ["customresourcedefinitions"]
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect(),
+                    [
+                        "customresourcedefinitions",
+                        "clusterrolebindings",
+                        "clusterroles",
+                    ]
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect(),
                 ),
                 verbs: ["delete", "create", "patch", "list", "get"]
                     .iter()
