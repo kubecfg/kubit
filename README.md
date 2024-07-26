@@ -146,7 +146,7 @@ This has a few advantages:
 To use `kubit` in single namespace mode, install the `single-namespace` flavor of the `kustomize` package into a specific namespace:
 
 ```
-kubectl apply -k 'https://github.com/kubecfg/kubit//kustomize/single-namespace?ref=v0.0.13' -n <my-application-namespace>
+kubectl apply -k 'https://github.com/kubecfg/kubit//kustomize/single-namespace?ref=v0.0.18' -n <my-application-namespace>
 ```
 
 This instance of `kubit` is then configured by creating a `ConfigMap` named `app-instance` with the `data` field containing a key `app-instance` with the yaml
