@@ -4,15 +4,21 @@ use kube::ResourceExt;
 use std::env;
 
 pub const KUBIT_APPLIER_FIELD_MANAGER: &str = "kubit-applier";
-pub const KUBECTL_IMAGE: &str = "bitnami/kubectl:1.27.5";
+/// Image used within the "apply" step of kubit
+pub const DEFAULT_APPLY_KUBECTL_IMAGE: &str = "bitnami/kubectl:1.27.5";
 pub const KUBECTL_APPLYSET_ENABLED: &str = "KUBECTL_APPLYSET=true";
 
 /// Generates shell script that will apply the manifests and writes it to w
-pub fn emit_script<W>(app_instance: &AppInstance, docker: bool, w: &mut W) -> Result<()>
+pub fn emit_script<W>(
+    app_instance: &AppInstance,
+    docker: bool,
+    kubectl_image: &str,
+    w: &mut W,
+) -> Result<()>
 where
     W: std::io::Write,
 {
-    let script = script(app_instance, "/tmp/manifests", &None, docker)?;
+    let script = script(app_instance, "/tmp/manifests", &None, docker, kubectl_image)?;
     write!(w, "{script}")?;
     Ok(())
 }
@@ -23,8 +29,15 @@ pub fn script(
     manifests_dir: &str,
     impersonate_user: &Option<String>,
     docker: bool,
+    kubectl_image: &str,
 ) -> Result<Script> {
-    let tokens = emit_commandline(app_instance, manifests_dir, impersonate_user, docker);
+    let tokens = emit_commandline(
+        app_instance,
+        manifests_dir,
+        impersonate_user,
+        docker,
+        kubectl_image,
+    );
     Ok(Script::from_vec(tokens))
 }
 
@@ -33,6 +46,7 @@ pub fn emit_commandline(
     manifests_dir: &str,
     impersonate_user: &Option<String>,
     docker: bool,
+    kubectl_image: &str,
 ) -> Vec<String> {
     let mut cli: Vec<String> = vec![];
 
@@ -56,7 +70,7 @@ pub fn emit_commandline(
                 KUBECTL_APPLYSET_ENABLED,
                 "--env",
                 "KUBECONFIG=/.kube/config",
-                KUBECTL_IMAGE,
+                kubectl_image,
             ]
             .iter()
             .map(|s| s.to_string())
@@ -137,7 +151,13 @@ mod tests {
             fake_manifest_dir,
         ];
 
-        let output = emit_commandline(&app_instance, fake_manifest_dir, &None, docker);
+        let output = emit_commandline(
+            &app_instance,
+            fake_manifest_dir,
+            &None,
+            docker,
+            DEFAULT_APPLY_KUBECTL_IMAGE,
+        );
 
         assert_eq!(output, expected);
     }

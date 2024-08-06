@@ -45,6 +45,10 @@ pub enum Local {
         /// Override the package image field in the spec
         #[clap(long)]
         package_image: Option<String>,
+
+        /// Override the package image field in the spec
+        #[clap(long, default_value = apply::DEFAULT_APPLY_KUBECTL_IMAGE)]
+        apply_step_image: String,
     },
 
     /// Delete the resources created by a packaged AppInstance.
@@ -93,6 +97,7 @@ pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()>
             pre_diff,
             skip_auth,
             docker,
+            apply_step_image,
         } => {
             apply(
                 app_instance,
@@ -102,6 +107,7 @@ pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()>
                 *pre_diff,
                 *docker,
                 *skip_auth,
+                apply_step_image.to_string(),
             )
             .await?;
         }
@@ -171,6 +177,7 @@ pub async fn apply(
     pre_diff: bool,
     docker: bool,
     skip_auth: bool,
+    kubectl_image: String,
 ) -> Result<()> {
     let (output, path) = get_script(dry_run)?;
 
@@ -193,6 +200,7 @@ pub async fn apply(
             impersonate_user,
             docker,
             skip_auth,
+            kubectl_image.clone(),
         )
         .await?;
         if !confirm_continue() {
@@ -209,6 +217,7 @@ pub async fn apply(
         docker,
         skip_auth,
         path,
+        kubectl_image,
     )
     .await
 }
@@ -271,6 +280,7 @@ async fn write_apply_script(
     docker: bool,
     skip_auth: bool,
     path: Option<PathBuf>,
+    kubectl_image: String,
 ) -> Result<()> {
     let mut steps: Vec<Script> = vec![];
 
@@ -284,7 +294,7 @@ async fn write_apply_script(
                 Some(DryRun::Render) => Script::from_str("cat"),
                 Some(DryRun::Diff) => diff(&app_instance)?,
                 Some(DryRun::Script) | None => {
-                    apply::script(&app_instance, "-", impersonate_user, docker)?
+                    apply::script(&app_instance, "-", impersonate_user, docker, &kubectl_image)?
                 }
             },
     ]);
@@ -348,6 +358,7 @@ async fn prediff(
     impersonate_user: &Option<String>,
     docker: bool,
     skip_auth: bool,
+    kubectl_image: String,
 ) -> Result<()> {
     let (output, path) = get_script(dry_run)?;
 
@@ -367,6 +378,7 @@ async fn prediff(
         docker,
         skip_auth,
         path,
+        kubectl_image,
     )
     .await
 }
