@@ -30,6 +30,31 @@ async fn main() -> anyhow::Result<()> {
         #[clap(flatten)]
         admin: kubert::AdminArgs,
 
+        /// Kubectl image to use for the apply step of kubit.
+        ///
+        /// This MUST be greater than v1.27 of kubectl as we utilise the applyset
+        /// functionality
+        #[clap(
+            name = "apply-step-image",
+            long,
+            env = "KUBIT_APPLY_STEP_KUBECTL_IMAGE",
+            default_value = apply::DEFAULT_APPLY_KUBECTL_IMAGE
+        )]
+        apply_image_kubectl: String,
+
+        /// Kubectl image to use for the render step of kubit.
+        ///
+        /// This MUST be greater than v1.27 of kubectl as we utilise the applyset
+        /// functionality
+        #[clap(
+            name = "render-step-image",
+            long,
+            env = "KUBIT_RENDER_STEP_KUBECTL_IMAGE",
+            default_value = crate::controller::KUBECTL_IMAGE
+        )]
+        render_image_kubectl: String,
+
+        /// Kubecfg image to use within the render step
         #[clap(
             long,
             env = "KUBIT_KUBECFG_IMAGE",
@@ -116,6 +141,8 @@ async fn main() -> anyhow::Result<()> {
         admin,
         kubecfg_image,
         kubit_image,
+        apply_image_kubectl,
+        render_image_kubectl,
         command,
         only_paused,
         watched_namespace,
@@ -158,7 +185,9 @@ async fn main() -> anyhow::Result<()> {
                 Scripts::Render => {
                     render::emit_script(&app_instance, false, *skip_auth, &mut output).await?
                 }
-                Scripts::Apply => apply::emit_script(&app_instance, false, &mut output)?,
+                Scripts::Apply => {
+                    apply::emit_script(&app_instance, false, &apply_image_kubectl, &mut output)?
+                }
             }
         }
         None => {
@@ -177,6 +206,8 @@ async fn main() -> anyhow::Result<()> {
                 rt.client(),
                 kubecfg_image,
                 kubit_image,
+                apply_image_kubectl,
+                render_image_kubectl,
                 only_paused,
                 config_map_name,
                 watched_namespace,
