@@ -601,7 +601,7 @@ impl AppInstanceLike {
                             name: "setup-delete".to_string(),
                             // We need to use the bitnami image to make use of the in built
                             // shell to use the stdout redirection into a file.
-                            image: Some(apply::DEFAULT_APPLY_KUBECTL_IMAGE.to_string()),
+                            image: Some(ctx.apply_step_image()),
                             command: Some(vec!["/bin/sh".to_string()]),
                             args: Some(vec![
                                 "-c".to_string(),
