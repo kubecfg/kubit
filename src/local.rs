@@ -169,6 +169,7 @@ impl<W: Write> WriteClose for NopDeferredDelete<W> {}
 impl WriteClose for NamedTempFile {}
 
 /// Generate a script that runs kubecfg show and kubectl apply and runs it.
+#[allow(clippy::too_many_arguments)]
 pub async fn apply(
     app_instance: &str,
     dry_run: &Option<DryRun>,

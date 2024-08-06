@@ -35,7 +35,8 @@ use oci_distribution::{secrets::RegistryAuth, Reference};
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    apply, delete,
+    apply::{self},
+    delete,
     docker_config::DockerConfig,
     oci::{self, PackageConfig},
     render,
@@ -43,7 +44,7 @@ use crate::{
     Error, Result,
 };
 
-const KUBECTL_IMAGE: &str = "registry.k8s.io/kubectl:v1.28.0";
+pub const KUBECTL_IMAGE: &str = "registry.k8s.io/kubectl:v1.28.0";
 
 const APPLIER_SERVICE_ACCOUNT: &str = "kubit-applier";
 
@@ -53,8 +54,20 @@ struct Context {
     client: Client,
     kubecfg_image: String,
     kubit_image: String,
+    kubectl_image_apply: String,
+    kubectl_image_render: String,
     config_map_name: Option<String>,
     only_paused: bool,
+}
+
+impl Context {
+    pub fn apply_step_image(&self) -> String {
+        self.kubectl_image_apply.clone()
+    }
+
+    pub fn render_step_image(&self) -> String {
+        self.kubectl_image_render.clone()
+    }
 }
 
 fn error_policy_app_instance(
@@ -186,10 +199,13 @@ async fn reconcile(app_instance: AppInstanceLike, ctx: Arc<Context>) -> Result<A
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run(
     client: Client,
     kubecfg_image: String,
     kubit_image: String,
+    apply_step_image: String,
+    render_step_image: String,
     only_paused: bool,
     config_map_name: Option<String>,
     watched_namespace: Option<String>,
@@ -226,6 +242,8 @@ pub async fn run(
                     kubit_image,
                     config_map_name: None,
                     only_paused,
+                    kubectl_image_apply: apply_step_image,
+                    kubectl_image_render: render_step_image,
                 }),
             )
             .filter_map(|x| async move { std::result::Result::ok(x) })
@@ -252,6 +270,8 @@ pub async fn run(
                     kubit_image,
                     config_map_name,
                     only_paused,
+                    kubectl_image_apply: apply_step_image,
+                    kubectl_image_render: render_step_image,
                 }),
             )
             .filter_map(|x| async move { std::result::Result::ok(x) })
@@ -581,7 +601,7 @@ impl AppInstanceLike {
                             name: "setup-delete".to_string(),
                             // We need to use the bitnami image to make use of the in built
                             // shell to use the stdout redirection into a file.
-                            image: Some(apply::KUBECTL_IMAGE.to_string()),
+                            image: Some(apply::DEFAULT_APPLY_KUBECTL_IMAGE.to_string()),
                             command: Some(vec!["/bin/sh".to_string()]),
                             args: Some(vec![
                                 "-c".to_string(),
@@ -600,7 +620,7 @@ impl AppInstanceLike {
                         }]),
                         containers: vec![Container {
                             name: "cleanup-manifests".to_string(),
-                            image: Some(KUBECTL_IMAGE.to_string()),
+                            image: Some(ctx.render_step_image()),
                             command: Some(delete::emit_commandline(
                                 &self.instance,
                                 &format!(
@@ -952,12 +972,13 @@ impl AppInstanceLike {
                         ),
                         containers: vec![Container {
                             name: "apply-manifests".to_string(),
-                            image: Some(KUBECTL_IMAGE.to_string()),
+                            image: Some(ctx.apply_step_image()),
                             command: Some(apply::emit_commandline(
                                 &self.instance,
                                 "/manifests",
                                 &None,
                                 false,
+                                &ctx.apply_step_image(),
                             )),
                             ..container_defaults.clone()
                         }],
