@@ -218,6 +218,9 @@ pub async fn run(
         Api::<Job>::all(client.clone())
     };
 
+    info!("apply/delete image: {apply_step_image}");
+    info!("render image: {render_step_image}");
+
     if watched_namespace.is_none() {
         info!("running kubit manager in AppInstance (CRD) mode");
         let docs = if let Some(ns) = namespace {
