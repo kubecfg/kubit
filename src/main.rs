@@ -183,7 +183,14 @@ async fn main() -> anyhow::Result<()> {
             let mut output = stdout().lock();
             match script {
                 Scripts::Render => {
-                    render::emit_script(&app_instance, false, *skip_auth, &mut output).await?
+                    render::emit_script(
+                        &app_instance,
+                        false,
+                        *skip_auth,
+                        kubecfg_image,
+                        &mut output,
+                    )
+                    .await?
                 }
                 Scripts::Apply => {
                     apply::emit_script(&app_instance, false, &apply_image_kubectl, &mut output)?

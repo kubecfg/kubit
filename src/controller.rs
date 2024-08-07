@@ -1242,6 +1242,7 @@ impl AppInstanceLike {
                         Some("/manifests"),
                         false,
                         false,
+                        kubecfg_image.to_string(),
                     )
                     .await,
                 ),

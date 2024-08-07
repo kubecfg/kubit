@@ -10,6 +10,7 @@ pub async fn emit_script<W>(
     app_instance: &AppInstance,
     docker: bool,
     skip_auth: bool,
+    kubecfg_image: String,
     w: &mut W,
 ) -> Result<()>
 where
@@ -25,6 +26,7 @@ where
         Some("/tmp/manifests"),
         docker,
         skip_auth,
+        kubecfg_image,
     )
     .await?;
     writeln!(w, "{script}")?;
@@ -38,6 +40,7 @@ pub async fn script(
     output_dir: Option<&str>,
     docker: bool,
     skip_auth: bool,
+    kubecfg_image: String,
 ) -> Result<Script> {
     let tokens = emit_commandline(
         app_instance,
@@ -45,6 +48,7 @@ pub async fn script(
         output_dir,
         docker,
         skip_auth,
+        kubecfg_image,
     )
     .await;
     Ok(Script::from_vec(tokens))
@@ -56,6 +60,7 @@ pub async fn emit_commandline(
     output_dir: Option<&str>,
     docker: bool,
     skip_auth: bool,
+    kubecfg_image: String,
 ) -> Vec<String> {
     let image = &app_instance.spec.package.image;
 
@@ -79,7 +84,7 @@ pub async fn emit_commandline(
             .await
             .unwrap();
         let kubecfg_image = package_config
-            .versioned_kubecfg_image(DEFAULT_KUBECFG_IMAGE)
+            .versioned_kubecfg_image(&kubecfg_image)
             .expect("unable to parse kubecfg image");
 
         cli.extend(
@@ -253,8 +258,15 @@ mod tests {
             test_overlay_file,
         ];
 
-        let output =
-            emit_commandline(&app_instance, TEST_PACKAGE_FILE, None, docker, skip_auth).await;
+        let output = emit_commandline(
+            &app_instance,
+            TEST_PACKAGE_FILE,
+            None,
+            docker,
+            skip_auth,
+            DEFAULT_KUBECFG_IMAGE.to_string(),
+        )
+        .await;
 
         assert_eq!(output, expected);
     }
