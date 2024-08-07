@@ -58,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
         #[clap(
             long,
             env = "KUBIT_KUBECFG_IMAGE",
-            default_value = render::KUBECFG_IMAGE
+            default_value = render::DEFAULT_KUBECFG_IMAGE
         )]
         kubecfg_image: String,
 

@@ -2,7 +2,7 @@ use assert_cmd::prelude::*;
 use kubit::apply::{
     DEFAULT_APPLY_KUBECTL_IMAGE, KUBECTL_APPLYSET_ENABLED, KUBIT_APPLIER_FIELD_MANAGER,
 };
-use kubit::render::KUBECFG_IMAGE;
+use kubit::render::DEFAULT_KUBECFG_IMAGE;
 use std::path::PathBuf;
 use std::process::Command;
 use std::str::from_utf8;
@@ -39,7 +39,7 @@ async fn local_apply_dry_run_script() {
     assert!(output.contains("docker"));
     assert!(output.contains(DEMO_PACKAGE));
     assert!(output.contains(DEFAULT_APPLY_KUBECTL_IMAGE));
-    assert!(output.contains(KUBECFG_IMAGE));
+    assert!(output.contains(DEFAULT_KUBECFG_IMAGE));
     assert!(output.contains(KUBECTL_APPLYSET_ENABLED));
     assert!(output.contains(KUBIT_APPLIER_FIELD_MANAGER));
     assert!(output.contains("--server-side"));
