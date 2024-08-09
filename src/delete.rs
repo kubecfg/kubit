@@ -1,6 +1,6 @@
 use crate::{
     apply::KUBECTL_APPLYSET_ENABLED,
-    apply::{KUBECTL_IMAGE, KUBIT_APPLIER_FIELD_MANAGER},
+    apply::{DEFAULT_APPLY_KUBECTL_IMAGE, KUBIT_APPLIER_FIELD_MANAGER},
     resources::AppInstance,
     scripting::Script,
     Result,
@@ -37,7 +37,7 @@ pub fn emit_commandline(
                 KUBECTL_APPLYSET_ENABLED,
                 "--env",
                 "KUBECONFIG=/.kube/config",
-                KUBECTL_IMAGE,
+                DEFAULT_APPLY_KUBECTL_IMAGE,
             ]
             .iter()
             .map(|s| s.to_string())
@@ -99,7 +99,7 @@ pub fn emit_post_deletion_commandline(
                 &format!("{}:/.kube/config", kube_config),
                 "--env",
                 "KUBECONFIG=/.kube/config",
-                KUBECTL_IMAGE,
+                DEFAULT_APPLY_KUBECTL_IMAGE,
             ]
             .iter()
             .map(|s| s.to_string())
@@ -159,7 +159,7 @@ pub fn emit_deletion_setup(
                 &format!("{}:/.kube/config", kube_config),
                 "--env",
                 "KUBECONFIG=/.kube/config",
-                KUBECTL_IMAGE,
+                DEFAULT_APPLY_KUBECTL_IMAGE,
             ]
             .iter()
             .map(|s| s.to_string())
