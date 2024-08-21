@@ -45,6 +45,16 @@ pub enum Local {
         /// Override the package image field in the spec
         #[clap(long)]
         package_image: Option<String>,
+
+        /// Override the kubectl image
+        ///
+        /// This MUST be greater than 1.27.0
+        #[clap(long, default_value = apply::DEFAULT_APPLY_KUBECTL_IMAGE)]
+        apply_step_image: String,
+
+        /// Override the image for kubecfg
+        #[clap(long, default_value = render::DEFAULT_KUBECFG_IMAGE)]
+        kubecfg_image: String,
     },
 
     /// Delete the resources created by a packaged AppInstance.
@@ -93,6 +103,8 @@ pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()>
             pre_diff,
             skip_auth,
             docker,
+            apply_step_image,
+            kubecfg_image,
         } => {
             apply(
                 app_instance,
@@ -102,6 +114,8 @@ pub async fn run(local: &Local, impersonate_user: &Option<String>) -> Result<()>
                 *pre_diff,
                 *docker,
                 *skip_auth,
+                apply_step_image.to_string(),
+                kubecfg_image.to_string(),
             )
             .await?;
         }
@@ -163,6 +177,7 @@ impl<W: Write> WriteClose for NopDeferredDelete<W> {}
 impl WriteClose for NamedTempFile {}
 
 /// Generate a script that runs kubecfg show and kubectl apply and runs it.
+#[allow(clippy::too_many_arguments)]
 pub async fn apply(
     app_instance: &str,
     dry_run: &Option<DryRun>,
@@ -171,6 +186,8 @@ pub async fn apply(
     pre_diff: bool,
     docker: bool,
     skip_auth: bool,
+    kubectl_image: String,
+    kubecfg_image: String,
 ) -> Result<()> {
     let (output, path) = get_script(dry_run)?;
 
@@ -193,6 +210,8 @@ pub async fn apply(
             impersonate_user,
             docker,
             skip_auth,
+            kubectl_image.clone(),
+            kubecfg_image.clone(),
         )
         .await?;
         if !confirm_continue() {
@@ -209,6 +228,8 @@ pub async fn apply(
         docker,
         skip_auth,
         path,
+        kubectl_image,
+        kubecfg_image,
     )
     .await
 }
@@ -271,6 +292,8 @@ async fn write_apply_script(
     docker: bool,
     skip_auth: bool,
     path: Option<PathBuf>,
+    kubectl_image: String,
+    kubecfg_image: String,
 ) -> Result<()> {
     let mut steps: Vec<Script> = vec![];
 
@@ -278,16 +301,22 @@ async fn write_apply_script(
         steps.extend([Script::from_str("export KUBECTL_APPLYSET=true")]);
     }
 
-    steps.extend([
-        render::script(&app_instance, overlay_file_name, None, docker, skip_auth).await?
-            | match dry_run {
-                Some(DryRun::Render) => Script::from_str("cat"),
-                Some(DryRun::Diff) => diff(&app_instance)?,
-                Some(DryRun::Script) | None => {
-                    apply::script(&app_instance, "-", impersonate_user, docker)?
-                }
-            },
-    ]);
+    steps.extend([render::script(
+        &app_instance,
+        overlay_file_name,
+        None,
+        docker,
+        skip_auth,
+        kubecfg_image,
+    )
+    .await?
+        | match dry_run {
+            Some(DryRun::Render) => Script::from_str("cat"),
+            Some(DryRun::Diff) => diff(&app_instance)?,
+            Some(DryRun::Script) | None => {
+                apply::script(&app_instance, "-", impersonate_user, docker, &kubectl_image)?
+            }
+        }]);
 
     let script: Script = steps.into_iter().sum();
 
@@ -341,6 +370,7 @@ async fn write_delete_script(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn prediff(
     overlay_file_name: &str,
     dry_run: &Option<DryRun>,
@@ -348,6 +378,8 @@ async fn prediff(
     impersonate_user: &Option<String>,
     docker: bool,
     skip_auth: bool,
+    kubectl_image: String,
+    kubecfg_image: String,
 ) -> Result<()> {
     let (output, path) = get_script(dry_run)?;
 
@@ -367,6 +399,8 @@ async fn prediff(
         docker,
         skip_auth,
         path,
+        kubectl_image,
+        kubecfg_image,
     )
     .await
 }
