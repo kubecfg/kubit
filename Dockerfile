@@ -1,7 +1,7 @@
 # Leveraging the pre-built Docker images with
 # cargo-chef and the Rust toolchain
 FROM lukemathwalker/cargo-chef:latest-rust-1.75.0@sha256:486ca13b5d6ef4ad2ae21022be903487e502ea7f860bb5b7c8a0ee9a17dfa4c6 AS chef
-WORKDIR app
+WORKDIR /app
 
 FROM chef AS planner
 COPY . .
@@ -20,6 +20,6 @@ FROM debian:bookworm-slim@sha256:ad86386827b083b3d71139050b47ffb32bbd9559ea9b134
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-WORKDIR app
+WORKDIR /app
 COPY --from=builder /app/target/release/kubit /usr/local/bin
 ENTRYPOINT ["/usr/local/bin/kubit"]

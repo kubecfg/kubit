@@ -854,7 +854,9 @@ impl AppInstanceLike {
 
     async fn launch_job(&self, ctx: &Context) -> Result<()> {
         self.setup_namespaced_roles(ctx).await?;
-        self.setup_cluster_roles(ctx).await?;
+        if ctx.config_map_name.is_none() {
+            self.setup_cluster_roles(ctx).await?;
+        }
 
         let package_config: PackageConfig = self.fetch_package_config(ctx).await?;
         info!("got package config");
