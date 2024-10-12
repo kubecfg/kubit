@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4
-      - uses: Swatinem/rust-cache@23bce251a8cd2ffc3c1075eaa2367cf899916d84 # v2
+      - uses: Swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2
       - name: Format
         run: cargo fmt --all --check
       - name: Lint
@@ -35,7 +35,7 @@ jobs:
     needs: [build]
     steps:
       - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4
-      - uses: Swatinem/rust-cache@23bce251a8cd2ffc3c1075eaa2367cf899916d84 # v2
+      - uses: Swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2
       - uses: AbsaOSS/k3d-action@4e8b3239042be1dc0aed6c5eb80c13b18200fc79 # v2.4.0
         with:
           cluster-name: "kubit-test-cluster-1"
