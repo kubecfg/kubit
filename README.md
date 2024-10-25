@@ -20,7 +20,7 @@ This means that the installation experience is decoupled from the language of ch
 ### Kubernetes controller
 
 ```bash
-kubectl apply -k 'https://github.com/kubecfg/kubit//kustomize/global?ref=v0.0.19'
+kubectl apply -k 'https://github.com/kubecfg/kubit//kustomize/global?ref=v0.0.20'
 ```
 
 The Kubernetes controller is the main way to use kubit.
@@ -40,7 +40,7 @@ brew install kubecfg/kubit/kubit
 Direct install from sources:
 
 ```bash
-cargo install --git https://github.com/kubecfg/kubit/ --tag v0.0.19
+cargo install --git https://github.com/kubecfg/kubit/ --tag v0.0.20
 ```
 
 The CLI is an optional tool that provides helpers and alternative ways to install and inspect packages.
@@ -146,7 +146,7 @@ This has a few advantages:
 To use `kubit` in single namespace mode, install the `single-namespace` flavor of the `kustomize` package into a specific namespace:
 
 ```
-kubectl apply -k 'https://github.com/kubecfg/kubit//kustomize/single-namespace?ref=v0.0.19' -n <my-application-namespace>
+kubectl apply -k 'https://github.com/kubecfg/kubit//kustomize/single-namespace?ref=v0.0.20' -n <my-application-namespace>
 ```
 
 This instance of `kubit` is then configured by creating a `ConfigMap` named `app-instance` with the `data` field containing a key `app-instance` with the yaml

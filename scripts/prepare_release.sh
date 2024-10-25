@@ -12,7 +12,7 @@ desired_version=$1
 
 if [ -z $1 ]; then
     echo -e "\ndesired_version is required\n"
-    echo -e "For example: prepare_release.sh 0.0.19\n"
+    echo -e "For example: prepare_release.sh 0.0.20\n"
     exit 1
 fi
 
