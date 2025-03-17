@@ -737,7 +737,7 @@ impl AppInstanceLike {
     async fn setup_cluster_roles(&self, ctx: &Context) -> Result<()> {
         let ns = self.instance.namespace_any();
         let pp = patch_params();
-        let crd_name = format!("{APPLIER_SERVICE_ACCOUNT}-crd");
+        let crd_name = format!("{APPLIER_SERVICE_ACCOUNT}-crd-{ns}");
 
         let metadata = ObjectMeta {
             name: Some(crd_name.clone()),
