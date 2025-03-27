@@ -13,7 +13,6 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: Swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2
@@ -89,25 +88,61 @@ jobs:
           tags: ghcr.io/kubecfg/kubit:latest
         if: github.event_name != 'pull_request'
 
-  create_release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: [build, pack]
+  build_release:
+    strategy:
+      matrix:
+        image:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+    runs-on: ${{ matrix.image }}
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # renovate: tag=v1
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: Swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab # v2
+      - name: Build Release
+        run: cargo build --release
+      - name: Upload Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubit_${{ runner.os }}_${{ runner.arch }}
+          path: target/release/kubit
+          retention-days: 5
+
+  create_release:
+    runs-on: ubuntu-24.04
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build_release]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Build Changelog
+        uses: mikepenz/release-changelog-builder-action@v5
+        with:
+          outputFile: CHANGELOG.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download Release Binaries
+        uses: actions/download-artifact@v4
         with:
+          pattern: kubit_Linux_*
+      - name: Move Release Binaries
+        run: |
+          mv kubit_Linux_X64/kubit   kubit.x86_64
+          mv kubit_Linux_ARM64/kubit kubit.aarch64
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: CHANGELOG.txt
+          files: |
+            kubit.x86_64
+            kubit.aarch64
+          token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ github.ref_name }}
-          release_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           draft: true
           prerelease: false
+          generate_release_notes: true
 
   release:
-
     # Allow depot permissions to GHCR
     permissions:
       contents: read
