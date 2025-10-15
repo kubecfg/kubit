@@ -5,7 +5,7 @@ use std::env;
 
 pub const KUBIT_APPLIER_FIELD_MANAGER: &str = "kubit-applier";
 /// Image used within the "apply" step of kubit
-pub const DEFAULT_APPLY_KUBECTL_IMAGE: &str = "bitnami/kubectl:1.27.5";
+pub const DEFAULT_APPLY_KUBECTL_IMAGE: &str = "bitnamisecure/kubectl";
 pub const KUBECTL_APPLYSET_ENABLED: &str = "KUBECTL_APPLYSET=true";
 
 /// Generates shell script that will apply the manifests and writes it to w
