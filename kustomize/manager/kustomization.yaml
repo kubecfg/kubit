@@ -8,4 +8,4 @@ configurations:
 images:
   - name: controller
     newName: ghcr.io/kubecfg/kubit
-    newTag: v0.0.20@sha256:e50f8188aced8e8d8530dadf90814f9bc5712f11fd255b82688f806bacc3e73c
+    newTag: v0.0.22@sha256:4097044dbea583248b02871c7e1141f1519b74fba5baf7aca306fa0af5b75f34

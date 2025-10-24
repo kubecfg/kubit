@@ -1304,7 +1304,7 @@ dependencies = [
 
 [[package]]
 name = "kubit"
-version = "0.0.20"
+version = "0.0.22"
 dependencies = [
  "anyhow",
  "assert_cmd",
