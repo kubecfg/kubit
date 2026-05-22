@@ -43,7 +43,7 @@ tempfile = "3.10.1"
 yash-quote = "1.1.1"
 tynm = "0.1.10"
 itertools = "0.12.1"
-base64 = "0.21.7"
+base64 = "0.22.0"
 assert_matches = "1.5.0"
 docker_credential = "1.3.1"
 home = { version = "0.5.9", features = [] }
