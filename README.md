@@ -1,8 +1,10 @@
 # Kubit
 
-## The kubecfg operator
+## The generic package installer operator
 
-The `kubit` operator is a Kubernetes controller that can render and apply jsonnet templates based on the [kubecfg](https://github.com/kubecfg/kubecfg) jsonnet tooling/framework.
+The `kubit` operator is a Kubernetes controller that can render and apply templates based on data + template engine.
+
+It started as tool that would install templates based on [kubecfg](https://github.com/kubecfg/kubecfg) jsonnet tooling/framework without requiring users to have kubecfg nor understand any jsonnet.
 
 ## Motivation
 
