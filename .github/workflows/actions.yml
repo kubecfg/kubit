@@ -8,13 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - name: Install action-validator with asdf
-        uses: asdf-vm/actions/install@05e0d2ed97b598bfce82fd30daf324ae0c4570e6 # v3
-        with:
-          tool_versions: |
-            action-validator 0.6.0
-
       - name: Lint Actions
         run: |
+          npm install -g @action-validator/cli@0.6.0
           find .github/workflows -type f \( -iname \*.yaml -o -iname \*.yml \) \
-            | xargs -I {} action-validator --verbose {}
+            | xargs -I {} action-validator {}
