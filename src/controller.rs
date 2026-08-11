@@ -547,7 +547,7 @@ impl AppInstanceLike {
             let docker_creds = Volume {
                 name: "docker".to_string(),
                 secret: Some(SecretVolumeSource {
-                    secret_name: secret_ref.name.clone(),
+                    secret_name: Some(secret_ref.name.clone()),
                     items: Some(vec![KeyToPath {
                         key: ".dockerconfigjson".to_string(),
                         path: "config.json".to_string(),
@@ -691,8 +691,7 @@ impl AppInstanceLike {
                 .exactly_one()
                 .map_err(|_| Error::UnsupportedMultipleImagePullSecrets)?
                 .name
-                .as_ref()
-                .expect("schema validation would have enforced this")
+                .as_str()
         };
 
         let ns = &self.instance.namespace().ok_or(Error::NamespaceRequired)?;
@@ -913,7 +912,7 @@ impl AppInstanceLike {
             let volume = Volume {
                 name: "docker".to_string(),
                 secret: Some(SecretVolumeSource {
-                    secret_name: secret_ref.name.clone(),
+                    secret_name: Some(secret_ref.name.clone()),
                     items: Some(vec![KeyToPath {
                         key: ".dockerconfigjson".to_string(),
                         path: "config.json".to_string(),
