@@ -68,12 +68,12 @@ pub async fn run(helper: &Helper) -> Result<()> {
 
             let data = cm.data.ok_or(anyhow::anyhow!(
                 "ConfigMap {} did not have a data field",
-                &config_map
+                config_map
             ))?;
 
             let app_instance = data.get("app-instance").ok_or(anyhow::anyhow!(
                 "ConfigMap {} data did not have an app-instance field",
-                &config_map
+                config_map
             ))?;
 
             let ai: AppInstance = serde_yaml::from_str(app_instance)?;
