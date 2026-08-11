@@ -105,7 +105,7 @@ jobs:
       - name: Build Release
         run: cargo build --release
       - name: Upload Build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: kubit_${{ runner.os }}_${{ runner.arch }}
           path: target/release/kubit
@@ -118,13 +118,13 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Build Changelog
-        uses: mikepenz/release-changelog-builder-action@v5
+        uses: mikepenz/release-changelog-builder-action@c9dc8369bccbc41e0ac887f8fd674f5925d315f7 # v5
         with:
           outputFile: CHANGELOG.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Download Release Binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: kubit_Linux_*
       - name: Move Release Binaries
@@ -132,7 +132,7 @@ jobs:
           mv kubit_Linux_X64/kubit   kubit.x86_64
           mv kubit_Linux_ARM64/kubit kubit.aarch64
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           body_path: CHANGELOG.txt
           files: |
