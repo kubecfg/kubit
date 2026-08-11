@@ -18,6 +18,9 @@ kube = { version = "1.1", features = [
     "client",
     "derive",
     "rustls-tls",
+    # rustls 0.23 has no built-in default crypto provider; kube and kubert both
+    # split the choice out into its own feature, so it must be selected here.
+    "ring",
 ], default-features = false }
 k8s-openapi = { version = "0.25.0", features = ["v1_30", "schemars"] }
 kubert = { version = "0.25.0", features = [
@@ -25,7 +28,7 @@ kubert = { version = "0.25.0", features = [
     "runtime",
     "server",
     "prometheus-client",
-    "rustls-tls",
+    "rustls-tls-ring",
 ], default-features = false }
 tokio = { version = "1.36", features = ["full"] }
 anyhow = { version = "1.0.82", features = ["backtrace"] }
