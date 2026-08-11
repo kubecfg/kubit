@@ -530,7 +530,7 @@ impl AppInstanceLike {
 
     async fn launch_cleanup_job(&self, ctx: &Context) -> Result<()> {
         let ns = &self.instance.namespace().ok_or(Error::NamespaceRequired)?;
-        let cleanup_job_name = format!("kubit-cleanup-{}", &self.name_any());
+        let cleanup_job_name = format!("kubit-cleanup-{}", self.name_any());
 
         let mut volumes = vec![Volume {
             name: "manifests".to_string(),
