@@ -25,7 +25,7 @@ kube = { version = "1.1", features = [
     # silently ignored the variable.
     "http-proxy",
 ], default-features = false }
-k8s-openapi = { version = "0.25.0", features = ["v1_30", "schemars"] }
+k8s-openapi = { version = "0.28.0", features = ["v1_30", "schemars"] }
 kubert = { version = "0.25.0", features = [
     "clap",
     "runtime",
